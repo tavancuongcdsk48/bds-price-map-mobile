@@ -382,7 +382,7 @@ export default function App() {
 
       {/* Modal Đăng Ghim Cho Chủ Nhà (Ảnh & Video) */}
       <CreatePinModal
-        visible={createModalVisible}
+        visible={createModalVisible && !pickerVisible}
         onClose={() => setCreateModalVisible(false)}
         onSubmit={handleCreateNewPin}
         currentCoords={location}

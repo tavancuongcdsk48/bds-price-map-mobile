@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Modal,
   View,
   Text,
   TouchableOpacity,
@@ -96,10 +95,11 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
       ? `Cách vị trí hiện tại ${offsetFromGps}m — kiểm tra lại cho chắc`
       : `Cách vị trí hiện tại ${(offsetFromGps / 1000).toFixed(1)}km — khác xa nơi đang đứng`;
 
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onCancel}>
-      <View style={styles.container}>
-        <MapView
+    <View style={styles.fullScreen}>
+      <MapView
           ref={mapRef}
           provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
           style={styles.map}
@@ -173,13 +173,21 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
             </TouchableOpacity>
           </View>
         </SafeAreaView>
-      </View>
-    </Modal>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
+  fullScreen: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#0f172a',
+    zIndex: 200,
+    elevation: 200,
+  },
   map: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
 
   crosshairWrap: {
