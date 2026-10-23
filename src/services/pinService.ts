@@ -26,7 +26,7 @@ export async function fetchPinsInBounds(
   maxLat: number,
   propertyType?: string,
   hasVideoOnly?: boolean
-): Promise<PinItem[]> {
+): Promise<PinItem[] | null> {
   try {
     const { data, error } = await supabase.rpc('get_pins_in_bounds', {
       min_lng: minLng,
@@ -39,7 +39,7 @@ export async function fetchPinsInBounds(
 
     if (error) {
       console.warn('Supabase RPC Error:', error.message);
-      return [];
+      return null;
     }
 
     if (!data) return [];
@@ -62,7 +62,7 @@ export async function fetchPinsInBounds(
     }));
   } catch (err) {
     console.warn('Lỗi kết nối fetchPinsInBounds:', err);
-    return [];
+    return null;
   }
 }
 

@@ -130,7 +130,9 @@ export default function App() {
 
     const hasVideoOnly = activeFilter === 'video';
     const serverPins = await fetchPinsInBounds(minLng, minLat, maxLng, maxLat, activeFilter, hasVideoOnly);
-    if (serverPins.length > 0) {
+
+    // null = lỗi kết nối (giữ dữ liệu cũ); [] = vùng này chưa có ghim (hiện trống)
+    if (serverPins !== null) {
       setPinsList(serverPins);
     }
   };
@@ -264,6 +266,7 @@ export default function App() {
           provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
           style={styles.map}
           initialRegion={initialRegion}
+          onRegionChangeComplete={(region) => loadPins(region)}
           showsUserLocation={true}
           showsMyLocationButton={false}
           showsCompass={false}
