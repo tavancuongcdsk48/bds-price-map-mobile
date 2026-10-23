@@ -14,6 +14,7 @@ import {
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useGoogleAuth } from './src/hooks/useGoogleAuth';
+import { CreatePinModal, NewPinData } from './src/components/CreatePinModal';
 
 interface PinItem {
   id: string;
@@ -104,6 +105,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [selectedPin, setSelectedPin] = useState<PinItem | null>(null);
   const [activeFilter, setActiveFilter] = useState<string>('all');
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [pinsList, setPinsList] = useState<PinItem[]>(SEED_PINS);
 
   // Supabase Google Auth Hook
   const { user, isAuthenticated, signInWithGoogle, signOut } = useGoogleAuth();
@@ -143,6 +146,35 @@ export default function App() {
     }
   };
 
+  const handleCreateNewPin = (data: NewPinData) => {
+    // Toạ độ mặc định quanh khu vực đang đứng có độ lệch làm mờ 50-100m
+    const baseLat = location ? location.latitude : 21.0335;
+    const baseLng = location ? location.longitude : 105.7942;
+    const jitterLat = (Math.random() - 0.5) * 0.001; // ~50-80m
+    const jitterLng = (Math.random() - 0.5) * 0.001;
+
+    const newPin: PinItem = {
+      id: 'pin-' + Date.now(),
+      title: data.title,
+      price_vnd: data.price_vnd,
+      price_display: (data.price_vnd / 1000000000).toFixed(1) + ' Tỷ',
+      price_per_m2_display: Math.round(data.price_vnd / data.area_m2 / 1000000) + ' tr/m²',
+      area_m2: data.area_m2,
+      latitude: baseLat + jitterLat,
+      longitude: baseLng + jitterLng,
+      property_type: data.property_type,
+      has_video: !!data.video_uri,
+      video_duration: data.video_uri ? '0:45' : undefined,
+      contact_phone: data.contact_phone,
+      address_text: data.address_text,
+      is_verified: true,
+    };
+
+    setPinsList(prev => [newPin, ...prev]);
+    setSelectedPin(newPin);
+    Alert.alert('Thành công 🎉', 'Ghim bán nhà của bạn đã được xuất bản lên bản đồ!');
+  };
+
   const handleCallOwner = (phone: string) => {
     Linking.openURL(`tel:${phone}`);
   };
@@ -151,7 +183,7 @@ export default function App() {
     Linking.openURL(`https://zalo.me/${phone}`);
   };
 
-  const filteredPins = SEED_PINS.filter(p => {
+  const filteredPins = pinsList.filter(p => {
     if (activeFilter === 'video') return p.has_video;
     if (activeFilter === 'nha-pho') return p.property_type === 'nha-pho';
     if (activeFilter === 'can-ho') return p.property_type === 'can-ho';
@@ -272,7 +304,7 @@ export default function App() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.fabAdd}
-          onPress={() => Alert.alert('Đăng ghim nhà', 'Kéo marker để chọn toạ độ và nhập giá bán, diện tích, ảnh & video.')}
+          onPress={() => setCreateModalVisible(true)}
         >
           <Text style={styles.fabAddText}>+</Text>
         </TouchableOpacity>
@@ -340,6 +372,14 @@ export default function App() {
           </View>
         </View>
       )}
+
+      {/* Modal Đăng Ghim Cho Chủ Nhà (Ảnh & Video) */}
+      <CreatePinModal
+        visible={createModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        onSubmit={handleCreateNewPin}
+        currentCoords={location}
+      />
     </SafeAreaView>
   );
 }
