@@ -1,21 +1,21 @@
 {
   "expo": {
-    "name": "Bản Đồ Giá BĐS",
-    "slug": "bds-price-map-mobile",
-    "scheme": "bds-price-map",
+    "name": "Vũ Trụ Chuyển Nhượng",
+    "slug": "vu-tru-chuyen-nhuong",
+    "scheme": "vutruchuyennhuong",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.cuongdms.bdspricemap",
+      "bundleIdentifier": "com.cuongdms.vutruchuyennhuong",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Ứng dụng cần quyền vị trí để hiển thị giá bất động sản xung quanh bạn."
       }
     },
     "android": {
-      "package": "com.cuongdms.bdspricemap",
+      "package": "com.cuongdms.vutruchuyennhuong",
       "adaptiveIcon": {
         "backgroundColor": "#0F172A",
         "foregroundImage": "./assets/android-icon-foreground.png"

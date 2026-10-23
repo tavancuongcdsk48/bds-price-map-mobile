@@ -238,7 +238,7 @@ export default function App() {
         <View style={styles.searchRow}>
           <View style={styles.searchBox}>
             <Text style={styles.searchIcon}>🔍</Text>
-            <Text style={styles.searchText}>Bản đồ Giá BĐS Việt Nam</Text>
+            <Text style={styles.searchText}>Vũ Trụ Chuyển Nhượng</Text>
           </View>
           <TouchableOpacity
             style={[styles.avatarButton, isAuthenticated && styles.avatarButtonActive]}
