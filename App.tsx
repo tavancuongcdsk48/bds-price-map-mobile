@@ -15,23 +15,7 @@ import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useGoogleAuth } from './src/hooks/useGoogleAuth';
 import { CreatePinModal, NewPinData } from './src/components/CreatePinModal';
-
-interface PinItem {
-  id: string;
-  title: string;
-  price_vnd: number;
-  price_display: string;
-  price_per_m2_display: string;
-  area_m2: number;
-  latitude: number;
-  longitude: number;
-  property_type: 'nha-pho' | 'can-ho' | 'dat-nen';
-  has_video: boolean;
-  video_duration?: string;
-  contact_phone: string;
-  address_text: string;
-  is_verified: boolean;
-}
+import { fetchPinsInBounds, createPinInSupabase, PinItem } from './src/services/pinService';
 
 const SEED_PINS: PinItem[] = [
   {
@@ -111,6 +95,7 @@ export default function App() {
   // Supabase Google Auth Hook
   const { user, isAuthenticated, signInWithGoogle, signOut } = useGoogleAuth();
 
+  // Khởi tạo GPS
   useEffect(() => {
     (async () => {
       try {
@@ -120,18 +105,38 @@ export default function App() {
           setLoading(false);
           return;
         }
-
-        const currentLoc = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
+        const currentLoc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         setLocation(currentLoc.coords);
       } catch (err) {
-        console.warn('Lỗi lấy GPS:', err);
+        console.warn('Lỗi GPS:', err);
       } finally {
         setLoading(false);
       }
     })();
   }, []);
+
+  // Tải danh sách ghim từ Supabase khi mở app hoặc đổi bộ lọc
+  const loadPins = async (currentRegion?: Region) => {
+    const lat = currentRegion ? currentRegion.latitude : (location ? location.latitude : 21.0335);
+    const lng = currentRegion ? currentRegion.longitude : (location ? location.longitude : 105.7942);
+    const latDelta = currentRegion ? currentRegion.latitudeDelta : 0.04;
+    const lngDelta = currentRegion ? currentRegion.longitudeDelta : 0.04;
+
+    const minLat = lat - latDelta / 2;
+    const maxLat = lat + latDelta / 2;
+    const minLng = lng - lngDelta / 2;
+    const maxLng = lng + lngDelta / 2;
+
+    const hasVideoOnly = activeFilter === 'video';
+    const serverPins = await fetchPinsInBounds(minLng, minLat, maxLng, maxLat, activeFilter, hasVideoOnly);
+    if (serverPins.length > 0) {
+      setPinsList(serverPins);
+    }
+  };
+
+  useEffect(() => {
+    loadPins();
+  }, [activeFilter, location]);
 
   const centerUserLocation = () => {
     if (location && mapRef.current) {
@@ -146,33 +151,17 @@ export default function App() {
     }
   };
 
-  const handleCreateNewPin = (data: NewPinData) => {
-    // Toạ độ mặc định quanh khu vực đang đứng có độ lệch làm mờ 50-100m
+  const handleCreateNewPin = async (data: NewPinData) => {
     const baseLat = location ? location.latitude : 21.0335;
     const baseLng = location ? location.longitude : 105.7942;
-    const jitterLat = (Math.random() - 0.5) * 0.001; // ~50-80m
-    const jitterLng = (Math.random() - 0.5) * 0.001;
+    const defaultUserId = user?.id || '361b7fe7-5586-4239-8329-54f8976b7f07';
 
-    const newPin: PinItem = {
-      id: 'pin-' + Date.now(),
-      title: data.title,
-      price_vnd: data.price_vnd,
-      price_display: (data.price_vnd / 1000000000).toFixed(1) + ' Tỷ',
-      price_per_m2_display: Math.round(data.price_vnd / data.area_m2 / 1000000) + ' tr/m²',
-      area_m2: data.area_m2,
-      latitude: baseLat + jitterLat,
-      longitude: baseLng + jitterLng,
-      property_type: data.property_type,
-      has_video: !!data.video_uri,
-      video_duration: data.video_uri ? '0:45' : undefined,
-      contact_phone: data.contact_phone,
-      address_text: data.address_text,
-      is_verified: true,
-    };
+    // Lưu vào Supabase PostGIS
+    await createPinInSupabase(data, baseLat, baseLng, defaultUserId);
 
-    setPinsList(prev => [newPin, ...prev]);
-    setSelectedPin(newPin);
-    Alert.alert('Thành công 🎉', 'Ghim bán nhà của bạn đã được xuất bản lên bản đồ!');
+    // Refresh lại ghim trên bản đồ
+    await loadPins();
+    Alert.alert('Thành công 🎉', 'Ghim bán nhà của bạn đã được lưu vĩnh viễn trên Supabase!');
   };
 
   const handleCallOwner = (phone: string) => {
