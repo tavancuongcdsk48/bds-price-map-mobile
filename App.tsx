@@ -9,9 +9,10 @@ import {
   StatusBar,
   ScrollView,
   Alert,
-  Linking
+  Linking,
+  Platform
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE, PROVIDER_DEFAULT, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useGoogleAuth } from './src/hooks/useGoogleAuth';
 import { CreatePinModal, NewPinData } from './src/components/CreatePinModal';
@@ -260,7 +261,7 @@ export default function App() {
       ) : (
         <MapView
           ref={mapRef}
-          provider={PROVIDER_GOOGLE}
+          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
           style={styles.map}
           initialRegion={initialRegion}
           showsUserLocation={true}
