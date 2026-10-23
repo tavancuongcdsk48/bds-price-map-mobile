@@ -16,6 +16,7 @@ import MapView, { Marker, PROVIDER_GOOGLE, PROVIDER_DEFAULT, Region } from 'reac
 import * as Location from 'expo-location';
 import { useGoogleAuth } from './src/hooks/useGoogleAuth';
 import { CreatePinModal, NewPinData } from './src/components/CreatePinModal';
+import { LocationPicker, LatLng } from './src/components/LocationPicker';
 import { fetchPinsInBounds, createPinInSupabase, PinItem } from './src/services/pinService';
 
 const SEED_PINS: PinItem[] = [
@@ -91,6 +92,9 @@ export default function App() {
   const [selectedPin, setSelectedPin] = useState<PinItem | null>(null);
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [createModalVisible, setCreateModalVisible] = useState(false);
+  // Toạ độ người đăng tự chọn trên bản đồ (null = dùng GPS)
+  const [pickedCoords, setPickedCoords] = useState<LatLng | null>(null);
+  const [pickerVisible, setPickerVisible] = useState(false);
   const [pinsList, setPinsList] = useState<PinItem[]>(SEED_PINS);
 
   // Supabase Google Auth Hook
@@ -155,16 +159,26 @@ export default function App() {
   };
 
   const handleCreateNewPin = async (data: NewPinData) => {
-    const baseLat = location ? location.latitude : 21.0335;
-    const baseLng = location ? location.longitude : 105.7942;
+    // Ưu tiên toạ độ người đăng tự chọn, sau đó mới tới GPS
+    const baseLat = pickedCoords?.latitude ?? (location ? location.latitude : 21.0335);
+    const baseLng = pickedCoords?.longitude ?? (location ? location.longitude : 105.7942);
     const defaultUserId = user?.id || '361b7fe7-5586-4239-8329-54f8976b7f07';
 
     // Lưu vào Supabase PostGIS
-    await createPinInSupabase(data, baseLat, baseLng, defaultUserId);
+    const saved = await createPinInSupabase(data, baseLat, baseLng, defaultUserId);
 
     // Refresh lại ghim trên bản đồ
     await loadPins();
-    Alert.alert('Thành công 🎉', 'Ghim bán nhà của bạn đã được lưu vĩnh viễn trên Supabase!');
+
+    if (saved) {
+      setPickedCoords(null);
+      Alert.alert('Thành công 🎉', 'Ghim bán nhà của bạn đã được lưu vĩnh viễn trên Supabase!');
+    } else {
+      Alert.alert(
+        'Chưa lưu được',
+        'Máy chủ từ chối lưu ghim. Kiểm tra kết nối Wi-Fi tới Supabase rồi thử lại.'
+      );
+    }
   };
 
   const handleCallOwner = (phone: string) => {
@@ -372,6 +386,25 @@ export default function App() {
         onClose={() => setCreateModalVisible(false)}
         onSubmit={handleCreateNewPin}
         currentCoords={location}
+        pickedCoords={pickedCoords}
+        onRequestPickLocation={() => setPickerVisible(true)}
+      />
+
+      {/* Màn hình tự đặt ghim chính xác trên bản đồ */}
+      <LocationPicker
+        visible={pickerVisible}
+        initial={
+          pickedCoords ??
+          (location
+            ? { latitude: location.latitude, longitude: location.longitude }
+            : { latitude: 21.0335, longitude: 105.7942 })
+        }
+        userLocation={location ? { latitude: location.latitude, longitude: location.longitude } : null}
+        onCancel={() => setPickerVisible(false)}
+        onConfirm={(coords) => {
+          setPickedCoords(coords);
+          setPickerVisible(false);
+        }}
       />
     </SafeAreaView>
   );

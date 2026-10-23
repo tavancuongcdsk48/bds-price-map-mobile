@@ -17,6 +17,10 @@ interface CreatePinModalProps {
   onClose: () => void;
   onSubmit: (pinData: NewPinData) => void;
   currentCoords: { latitude: number; longitude: number } | null;
+  /** Toạ độ người dùng đã chọn thủ công trên bản đồ (null = dùng GPS) */
+  pickedCoords?: { latitude: number; longitude: number } | null;
+  /** Mở màn hình chọn vị trí trên bản đồ */
+  onRequestPickLocation: () => void;
 }
 
 export interface NewPinData {
@@ -35,6 +39,8 @@ export const CreatePinModal: React.FC<CreatePinModalProps> = ({
   onClose,
   onSubmit,
   currentCoords,
+  pickedCoords,
+  onRequestPickLocation,
 }) => {
   const [title, setTitle] = useState('');
   const [priceBillion, setPriceBillion] = useState('');
@@ -228,6 +234,29 @@ export const CreatePinModal: React.FC<CreatePinModalProps> = ({
               onChangeText={setAddress}
             />
 
+            {/* Vị trí ghim: GPS hoặc tự đặt trên bản đồ */}
+            <Text style={styles.label}>Vị trí ghim trên bản đồ</Text>
+            <TouchableOpacity style={styles.locationRow} onPress={onRequestPickLocation}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.locationTitle}>
+                  {pickedCoords ? '📌 Vị trí tự chọn' : '📍 Vị trí hiện tại (GPS)'}
+                </Text>
+                <Text style={styles.locationSub}>
+                  {pickedCoords
+                    ? `${pickedCoords.latitude.toFixed(6)}, ${pickedCoords.longitude.toFixed(6)}`
+                    : currentCoords
+                    ? `${currentCoords.latitude.toFixed(6)}, ${currentCoords.longitude.toFixed(6)}`
+                    : 'Chưa có GPS — bấm để chọn trên bản đồ'}
+                </Text>
+              </View>
+              <Text style={styles.locationAction}>
+                {pickedCoords ? 'Đổi' : 'Chọn'}
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.locationHint}>
+              Không đứng tại căn nhà vẫn đặt được: bấm “Chọn” rồi kéo bản đồ cho tâm ngắm vào đúng vị trí.
+            </Text>
+
             {/* Chọn Ảnh & Video */}
             <Text style={styles.label}>Ảnh thực tế căn nhà (Tối đa 6 ảnh)</Text>
             <View style={styles.mediaRow}>
@@ -336,6 +365,26 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
   },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(34,197,94,0.35)',
+    gap: 10,
+  },
+  locationTitle: { color: '#f1f5f9', fontSize: 13, fontWeight: '600' },
+  locationSub: {
+    color: '#94a3b8',
+    fontSize: 11,
+    marginTop: 3,
+    fontVariant: ['tabular-nums'],
+  },
+  locationAction: { color: '#22c55e', fontSize: 13, fontWeight: '700' },
+  locationHint: { color: '#64748b', fontSize: 11, marginTop: 6, lineHeight: 16 },
   calcBox: {
     flexDirection: 'row',
     alignItems: 'center',
