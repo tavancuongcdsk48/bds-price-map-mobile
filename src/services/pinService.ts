@@ -3,6 +3,7 @@ import { NewPinData } from '../components/CreatePinModal';
 
 export interface PinItem {
   id: string;
+  user_id?: string;
   title: string;
   price_vnd: number;
   price_display: string;
@@ -19,13 +20,32 @@ export interface PinItem {
 }
 
 // 1. Lấy danh sách ghim trong khung nhìn (Viewport Bounding Box)
+function formatPin(item: any): PinItem {
+  return {
+    id: item.id,
+    user_id: item.user_id,
+    title: item.title,
+    price_vnd: Number(item.price_vnd),
+    price_display: (Number(item.price_vnd) / 1000000000).toFixed(1) + ' Tỷ',
+    price_per_m2_display: (Number(item.price_per_m2) / 1000000).toFixed(0) + ' tr/m²',
+    area_m2: Number(item.area_m2),
+    latitude: Number(item.latitude),
+    longitude: Number(item.longitude),
+    property_type: item.property_type,
+    has_video: item.has_video,
+    video_duration: item.has_video ? '0:45' : undefined,
+    contact_phone: item.contact_phone,
+    address_text: item.address_text,
+    is_verified: true,
+  };
+}
+
 export async function fetchPinsInBounds(
   minLng: number,
   minLat: number,
   maxLng: number,
   maxLat: number,
-  propertyType?: string,
-  hasVideoOnly?: boolean
+  propertyType?: string
 ): Promise<PinItem[] | null> {
   try {
     const { data, error } = await supabase.rpc('get_pins_in_bounds', {
@@ -33,8 +53,7 @@ export async function fetchPinsInBounds(
       min_lat: minLat,
       max_lng: maxLng,
       max_lat: maxLat,
-      p_type: propertyType && propertyType !== 'all' && propertyType !== 'video' ? propertyType : null,
-      has_video_only: hasVideoOnly || false,
+      p_type: propertyType && propertyType !== 'all' ? propertyType : null,
     });
 
     if (error) {
@@ -43,26 +62,27 @@ export async function fetchPinsInBounds(
     }
 
     if (!data) return [];
-
-    return data.map((item: any) => ({
-      id: item.id,
-      title: item.title,
-      price_vnd: item.price_vnd,
-      price_display: (Number(item.price_vnd) / 1000000000).toFixed(1) + ' Tỷ',
-      price_per_m2_display: (Number(item.price_per_m2) / 1000000).toFixed(0) + ' tr/m²',
-      area_m2: Number(item.area_m2),
-      latitude: item.latitude,
-      longitude: item.longitude,
-      property_type: item.property_type,
-      has_video: item.has_video,
-      video_duration: item.has_video ? '0:45' : undefined,
-      contact_phone: item.contact_phone,
-      address_text: item.address_text,
-      is_verified: true,
-    }));
+    return (data as any[]).map(formatPin);
   } catch (err) {
     console.warn('Lỗi kết nối fetchPinsInBounds:', err);
     return null;
+  }
+}
+
+// 2. Tìm ghim theo tên / địa chỉ cho thanh tìm kiếm
+export async function searchPinsByText(q: string): Promise<PinItem[]> {
+  const keyword = q.trim();
+  if (keyword.length < 2) return [];
+  try {
+    const { data, error } = await supabase.rpc('search_pins', { p_q: keyword });
+    if (error) {
+      console.warn('Lỗi search_pins:', error.message);
+      return [];
+    }
+    return ((data as any[]) || []).map(formatPin);
+  } catch (err) {
+    console.warn('Lỗi tìm ghim:', err);
+    return [];
   }
 }
 
@@ -117,5 +137,58 @@ export async function createPinInSupabase(
   } catch (err) {
     console.warn('Lỗi tạo pin:', err);
     return false;
+  }
+}
+
+// 4. Chủ ghim sửa giá — trigger DB tự ghi vào lịch sử giá
+export async function updatePinPrice(pinId: string, priceVnd: number): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('pins')
+      .update({ price_vnd: Math.round(priceVnd) })
+      .eq('id', pinId);
+
+    if (error) {
+      console.warn('Lỗi sửa giá:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Lỗi cập nhật giá:', err);
+    return false;
+  }
+}
+
+// 5. Lịch sử giá của một ghim (cũ → mới), nền cho biểu đồ giá theo tháng/năm
+export interface PriceHistoryPoint {
+  price_vnd: number;
+  price_per_m2: number;
+  source: 'created' | 'owner_edit';
+  created_at: string;
+}
+
+export async function fetchPriceHistory(pinId: string): Promise<PriceHistoryPoint[]> {
+  try {
+    const { data, error } = await supabase
+      .from('pin_price_history')
+      .select('price_vnd, price_per_m2, source, created_at')
+      .eq('pin_id', pinId)
+      .order('created_at', { ascending: true })
+      .limit(24);
+
+    if (error) {
+      console.warn('Lỗi lấy lịch sử giá:', error.message);
+      return [];
+    }
+
+    return ((data as any[]) || []).map((r) => ({
+      price_vnd: Number(r.price_vnd),
+      price_per_m2: Number(r.price_per_m2 || 0),
+      source: r.source,
+      created_at: r.created_at,
+    }));
+  } catch (err) {
+    console.warn('Lỗi lịch sử giá:', err);
+    return [];
   }
 }

@@ -10,13 +10,35 @@ import {
   ScrollView,
   Alert,
   Linking,
-  Platform
+  Platform,
+  TextInput
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, PROVIDER_DEFAULT, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useGoogleAuth } from './src/hooks/useGoogleAuth';
 import { CreatePinModal, NewPinData } from './src/components/CreatePinModal';
-import { fetchPinsInBounds, createPinInSupabase, PinItem } from './src/services/pinService';
+import {
+  fetchPinsInBounds,
+  searchPinsByText,
+  createPinInSupabase,
+  updatePinPrice,
+  fetchPriceHistory,
+  PinItem,
+  PriceHistoryPoint
+} from './src/services/pinService';
+import { searchPlaces, PlaceResult } from './src/services/placeSearch';
+
+type SearchRow = {
+  key: string;
+  kind: 'pin' | 'place';
+  label: string;
+  sub: string;
+  latitude: number;
+  longitude: number;
+  pin?: PinItem;
+};
+
+const DEMO_USER_ID = '361b7fe7-5586-4239-8329-54f8976b7f07';
 
 const SEED_PINS: PinItem[] = [
   {
@@ -96,6 +118,17 @@ export default function App() {
   // Chế độ đặt ghim thủ công: dùng chính bản đồ chính, không mở bản đồ thứ hai
   const [pickMode, setPickMode] = useState(false);
   const [pickCenter, setPickCenter] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  // Thanh tìm kiếm: khu vực, dự án, xã/huyện/tỉnh + ghim trong hệ thống
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchRow[]>([]);
+  const [searching, setSearching] = useState(false);
+  const searchTimer = useRef<any>(null);
+
+  // Lịch sử giá của ghim đang mở
+  const [priceHistory, setPriceHistory] = useState<PriceHistoryPoint[]>([]);
+  const [priceEditVisible, setPriceEditVisible] = useState(false);
+  const [priceInput, setPriceInput] = useState('');
   const [pinsList, setPinsList] = useState<PinItem[]>(SEED_PINS);
 
   // Supabase Google Auth Hook
@@ -133,8 +166,7 @@ export default function App() {
     const minLng = lng - lngDelta / 2;
     const maxLng = lng + lngDelta / 2;
 
-    const hasVideoOnly = activeFilter === 'video';
-    const serverPins = await fetchPinsInBounds(minLng, minLat, maxLng, maxLat, activeFilter, hasVideoOnly);
+    const serverPins = await fetchPinsInBounds(minLng, minLat, maxLng, maxLat, activeFilter);
 
     // null = lỗi kết nối (giữ dữ liệu cũ); [] = vùng này chưa có ghim (hiện trống)
     if (serverPins !== null) {
@@ -145,6 +177,15 @@ export default function App() {
   useEffect(() => {
     loadPins();
   }, [activeFilter, location]);
+
+  // Mỗi khi mở một ghim khác, nạp lịch sử giá của ghim đó
+  useEffect(() => {
+    if (selectedPin?.id) {
+      loadPriceHistory(selectedPin.id);
+    } else {
+      setPriceHistory([]);
+    }
+  }, [selectedPin?.id]);
 
   const centerUserLocation = () => {
     if (location && mapRef.current) {
@@ -206,6 +247,112 @@ export default function App() {
     setCreateModalVisible(true);
   };
 
+  // ---------- Tìm kiếm khu vực / dự án / ghim ----------
+  const runSearch = async (q: string) => {
+    if (q.trim().length < 2) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const [pins, places] = await Promise.all([searchPinsByText(q), searchPlaces(q)]);
+
+    const rows: SearchRow[] = [
+      ...pins.map((pin) => ({
+        key: `pin-${pin.id}`,
+        kind: 'pin' as const,
+        label: pin.title,
+        sub: `${pin.price_display} · ${pin.address_text}`,
+        latitude: pin.latitude,
+        longitude: pin.longitude,
+        pin,
+      })),
+      ...places.map((pl: PlaceResult, i: number) => ({
+        key: `place-${pl.id}-${i}`,
+        kind: 'place' as const,
+        label: pl.label,
+        sub: pl.sub || 'Địa điểm',
+        latitude: pl.latitude,
+        longitude: pl.longitude,
+      })),
+    ];
+
+    setSearchResults(rows);
+    setSearching(false);
+  };
+
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (text.trim().length < 2) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    searchTimer.current = setTimeout(() => runSearch(text), 450);
+  };
+
+  const clearSearch = () => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearching(false);
+  };
+
+  const handleSelectSearchResult = (row: SearchRow) => {
+    setSearchResults([]);
+    setSearchQuery(row.label);
+    const delta = row.kind === 'pin' ? 0.006 : 0.04;
+    mapRef.current?.animateToRegion(
+      {
+        latitude: row.latitude,
+        longitude: row.longitude,
+        latitudeDelta: delta,
+        longitudeDelta: delta,
+      },
+      600
+    );
+    if (row.pin) setSelectedPin(row.pin);
+  };
+
+  // ---------- Lịch sử giá ----------
+  const loadPriceHistory = (pinId: string) => {
+    fetchPriceHistory(pinId).then(setPriceHistory).catch(() => setPriceHistory([]));
+  };
+
+  const openPriceEditor = () => {
+    if (!selectedPin) return;
+    setPriceInput((selectedPin.price_vnd / 1000000000).toFixed(2));
+    setPriceEditVisible(true);
+  };
+
+  const savePriceEdit = async () => {
+    if (!selectedPin) return;
+    const billions = parseFloat(priceInput.replace(',', '.'));
+    if (isNaN(billions) || billions <= 0) {
+      Alert.alert('Giá chưa hợp lệ', 'Nhập giá theo đơn vị tỷ, ví dụ 6.85');
+      return;
+    }
+    const newPrice = Math.round(billions * 1000000000);
+    const ok = await updatePinPrice(selectedPin.id, newPrice);
+    if (!ok) {
+      Alert.alert('Chưa lưu được', 'Máy chủ từ chối cập nhật giá. Kiểm tra kết nối rồi thử lại.');
+      return;
+    }
+
+    const updated: PinItem = {
+      ...selectedPin,
+      price_vnd: newPrice,
+      price_display: (newPrice / 1000000000).toFixed(1) + ' Tỷ',
+      price_per_m2_display: Math.round(newPrice / selectedPin.area_m2 / 1000000) + ' tr/m²',
+    };
+    setPriceEditVisible(false);
+    setSelectedPin(updated);
+    setPinsList((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+    loadPriceHistory(updated.id);
+  };
+
   const handleCallOwner = (phone: string) => {
     Linking.openURL(`tel:${phone}`);
   };
@@ -215,7 +362,6 @@ export default function App() {
   };
 
   const filteredPins = pinsList.filter(p => {
-    if (activeFilter === 'video') return p.has_video;
     if (activeFilter === 'nha-pho') return p.property_type === 'nha-pho';
     if (activeFilter === 'can-ho') return p.property_type === 'can-ho';
     return true;
@@ -238,7 +384,17 @@ export default function App() {
         <View style={styles.searchRow}>
           <View style={styles.searchBox}>
             <Text style={styles.searchIcon}>🔍</Text>
-            <Text style={styles.searchText}>Vũ Trụ Chuyển Nhượng</Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Tìm khu vực, dự án, đường, xã/huyện/tỉnh..."
+              placeholderTextColor="#7c8aa0"
+              value={searchQuery}
+              onChangeText={handleSearchChange}
+              returnKeyType="search"
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+            />
+            {searching && <ActivityIndicator size="small" color="#22c55e" />}
           </View>
           <TouchableOpacity
             style={[styles.avatarButton, isAuthenticated && styles.avatarButtonActive]}
@@ -263,35 +419,62 @@ export default function App() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-          <TouchableOpacity
-            style={[styles.chip, activeFilter === 'all' && styles.chipActive]}
-            onPress={() => setActiveFilter('all')}
-          >
-            <Text style={[styles.chipText, activeFilter === 'all' && styles.chipTextActive]}>📍 Tất cả</Text>
-          </TouchableOpacity>
+        {(searchResults.length > 0 || searchQuery.trim().length >= 2) && (
+          <View style={styles.searchResults}>
+            {searchResults.length === 0 ? (
+              <Text style={styles.searchEmpty}>
+                {searching ? 'Đang tìm...' : 'Không tìm thấy khu vực hoặc ghim nào khớp'}
+              </Text>
+            ) : (
+              <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 300 }}>
+                {searchResults.map((r) => (
+                  <TouchableOpacity
+                    key={r.key}
+                    style={styles.searchResultRow}
+                    onPress={() => handleSelectSearchResult(r)}
+                  >
+                    <Text style={styles.searchResultIcon}>{r.kind === 'pin' ? '📌' : '📍'}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.searchResultLabel} numberOfLines={1}>
+                        {r.label}
+                      </Text>
+                      <Text style={styles.searchResultSub} numberOfLines={1}>
+                        {r.sub}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+            <TouchableOpacity style={styles.searchClose} onPress={clearSearch}>
+              <Text style={styles.searchCloseText}>Đóng</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-          <TouchableOpacity
-            style={[styles.chip, activeFilter === 'video' && styles.chipVideoActive]}
-            onPress={() => setActiveFilter('video')}
-          >
-            <Text style={[styles.chipText, activeFilter === 'video' && styles.chipTextActive]}>🎥 Có Video thật</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.chip, activeFilter === 'nha-pho' && styles.chipActive]}
-            onPress={() => setActiveFilter('nha-pho')}
-          >
-            <Text style={[styles.chipText, activeFilter === 'nha-pho' && styles.chipTextActive]}>🏡 Nhà phố</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.chip, activeFilter === 'can-ho' && styles.chipActive]}
-            onPress={() => setActiveFilter('can-ho')}
-          >
-            <Text style={[styles.chipText, activeFilter === 'can-ho' && styles.chipTextActive]}>🏢 Căn hộ</Text>
-          </TouchableOpacity>
-        </ScrollView>
+        <View style={styles.chipRow}>
+          {[
+            { key: 'all', label: 'Tất cả' },
+            { key: 'nha-pho', label: 'Nhà phố' },
+            { key: 'can-ho', label: 'Căn hộ' },
+            { key: 'dat-nen', label: 'Đất nền' },
+          ].map((tab) => (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.chipTab, activeFilter === tab.key && styles.chipActive]}
+              onPress={() => setActiveFilter(tab.key)}
+            >
+              <Text
+                style={[styles.chipText, activeFilter === tab.key && styles.chipTextActive]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.85}
+              >
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
       )}
 
@@ -425,6 +608,46 @@ export default function App() {
 
           <Text style={styles.addressText}>📍 {selectedPin.address_text}</Text>
 
+          {/* Lịch sử giá — nền dữ liệu cho biểu đồ giá theo tháng/năm */}
+          {priceHistory.length > 0 && (
+            <View style={styles.historyBox}>
+              <View style={styles.historyHead}>
+                <Text style={styles.historyTitle}>Lịch sử giá</Text>
+                <Text style={styles.historyCount}>{priceHistory.length} lần cập nhật</Text>
+              </View>
+
+              <View style={styles.chartRow}>
+                {priceHistory.slice(-8).map((h, idx, arr) => {
+                  const max = Math.max(...arr.map((x) => x.price_vnd));
+                  const min = Math.min(...arr.map((x) => x.price_vnd));
+                  const ratio = max === min ? 0.6 : 0.3 + ((h.price_vnd - min) / (max - min)) * 0.7;
+                  const isLast = idx === arr.length - 1;
+                  return (
+                    <View key={`${h.created_at}-${idx}`} style={styles.chartCol}>
+                      <Text style={styles.chartValue}>{(h.price_vnd / 1000000000).toFixed(1)}</Text>
+                      <View
+                        style={[
+                          styles.chartBar,
+                          { height: Math.round(46 * ratio), backgroundColor: isLast ? '#22c55e' : '#334155' },
+                        ]}
+                      />
+                      <Text style={styles.chartLabel}>
+                        {new Date(h.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* Chủ ghim được sửa giá */}
+          {(selectedPin.user_id ?? DEMO_USER_ID) === (user?.id || DEMO_USER_ID) && (
+            <TouchableOpacity style={styles.editPriceBtn} onPress={openPriceEditor}>
+              <Text style={styles.editPriceText}>✏️ Cập nhật giá rao bán</Text>
+            </TouchableOpacity>
+          )}
+
           {selectedPin.has_video && (
             <TouchableOpacity
               style={styles.videoBanner}
@@ -453,6 +676,43 @@ export default function App() {
         </View>
       )}
 
+      {/* Cập nhật giá — mỗi lần lưu là một mốc lịch sử giá */}
+      {priceEditVisible && (
+        <View style={styles.priceEditBackdrop}>
+          <View style={styles.priceEditCard}>
+            <Text style={styles.priceEditTitle}>Cập nhật giá rao bán</Text>
+            <Text style={styles.priceEditSub}>
+              Mỗi lần đổi giá được lưu thành một mốc lịch sử, sau này dựng biểu đồ giá theo tháng/năm cho
+              chính vị trí này.
+            </Text>
+
+            <View style={styles.priceEditInputRow}>
+              <TextInput
+                style={styles.priceEditInput}
+                keyboardType="decimal-pad"
+                value={priceInput}
+                onChangeText={setPriceInput}
+                autoFocus
+                selectTextOnFocus
+              />
+              <Text style={styles.priceEditUnit}>tỷ</Text>
+            </View>
+
+            <View style={styles.priceEditBtns}>
+              <TouchableOpacity
+                style={styles.priceEditCancel}
+                onPress={() => setPriceEditVisible(false)}
+              >
+                <Text style={styles.priceEditCancelText}>Huỷ</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.priceEditSave} onPress={savePriceEdit}>
+                <Text style={styles.priceEditSaveText}>Lưu giá mới</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* Modal Đăng Ghim Cho Chủ Nhà (Ảnh & Video) */}
       <CreatePinModal
         visible={createModalVisible && !pickMode}
@@ -471,6 +731,140 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0f172a',
   },
+  chipRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 10,
+  },
+  chipTab: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(30,41,59,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  searchInput: {
+    flex: 1,
+    color: '#f8fafc',
+    fontSize: 14,
+    paddingVertical: 0,
+    marginLeft: 6,
+  },
+  searchResults: {
+    marginTop: 8,
+    backgroundColor: 'rgba(15,23,42,0.98)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    paddingVertical: 4,
+    overflow: 'hidden',
+  },
+  searchEmpty: { color: '#94a3b8', fontSize: 13, paddingHorizontal: 14, paddingVertical: 12 },
+  searchResultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#1e293b',
+  },
+  searchResultIcon: { fontSize: 14 },
+  searchResultLabel: { color: '#f1f5f9', fontSize: 13, fontWeight: '600' },
+  searchResultSub: { color: '#94a3b8', fontSize: 11, marginTop: 2 },
+  searchClose: { alignItems: 'center', paddingVertical: 8 },
+  searchCloseText: { color: '#64748b', fontSize: 12 },
+
+  historyBox: {
+    marginTop: 12,
+    backgroundColor: 'rgba(15,23,42,0.6)',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  historyHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  historyTitle: { color: '#e2e8f0', fontSize: 12, fontWeight: '700' },
+  historyCount: { color: '#64748b', fontSize: 11 },
+  chartRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  chartCol: { alignItems: 'center', flex: 1 },
+  chartValue: { color: '#94a3b8', fontSize: 9, marginBottom: 4 },
+  chartBar: { width: '62%', borderRadius: 4, minHeight: 6 },
+  chartLabel: { color: '#64748b', fontSize: 9, marginTop: 4 },
+
+  editPriceBtn: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(34,197,94,0.5)',
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: 'center',
+    backgroundColor: 'rgba(34,197,94,0.12)',
+  },
+  editPriceText: { color: '#22c55e', fontSize: 13, fontWeight: '700' },
+
+  priceEditBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(2,6,23,0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    zIndex: 300,
+    elevation: 300,
+  },
+  priceEditCard: {
+    width: '100%',
+    backgroundColor: '#111c33',
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  priceEditTitle: { color: '#f8fafc', fontSize: 16, fontWeight: '700' },
+  priceEditSub: { color: '#94a3b8', fontSize: 12, marginTop: 6, lineHeight: 17 },
+  priceEditInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 14,
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  priceEditInput: { flex: 1, color: '#ffffff', fontSize: 22, fontWeight: '700', paddingVertical: 12 },
+  priceEditUnit: { color: '#94a3b8', fontSize: 14, fontWeight: '600' },
+  priceEditBtns: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  priceEditCancel: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+  },
+  priceEditCancelText: { color: '#e2e8f0', fontSize: 13, fontWeight: '600' },
+  priceEditSave: {
+    flex: 1.5,
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: 'center',
+    backgroundColor: '#22c55e',
+  },
+  priceEditSaveText: { color: '#052e16', fontSize: 14, fontWeight: '800' },
+
   pickCrosshairWrap: {
     position: 'absolute',
     top: '50%',
