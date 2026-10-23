@@ -16,7 +16,6 @@ import MapView, { Marker, PROVIDER_GOOGLE, PROVIDER_DEFAULT, Region } from 'reac
 import * as Location from 'expo-location';
 import { useGoogleAuth } from './src/hooks/useGoogleAuth';
 import { CreatePinModal, NewPinData } from './src/components/CreatePinModal';
-import { LocationPicker, LatLng } from './src/components/LocationPicker';
 import { fetchPinsInBounds, createPinInSupabase, PinItem } from './src/services/pinService';
 
 const SEED_PINS: PinItem[] = [
@@ -93,8 +92,10 @@ export default function App() {
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [createModalVisible, setCreateModalVisible] = useState(false);
   // Toạ độ người đăng tự chọn trên bản đồ (null = dùng GPS)
-  const [pickedCoords, setPickedCoords] = useState<LatLng | null>(null);
-  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pickedCoords, setPickedCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  // Chế độ đặt ghim thủ công: dùng chính bản đồ chính, không mở bản đồ thứ hai
+  const [pickMode, setPickMode] = useState(false);
+  const [pickCenter, setPickCenter] = useState<{ latitude: number; longitude: number } | null>(null);
   const [pinsList, setPinsList] = useState<PinItem[]>(SEED_PINS);
 
   // Supabase Google Auth Hook
@@ -181,6 +182,30 @@ export default function App() {
     }
   };
 
+  const startPickMode = () => {
+    const start =
+      pickedCoords ??
+      (location ? { latitude: location.latitude, longitude: location.longitude } : { latitude: 21.0335, longitude: 105.7942 });
+    setPickCenter(start);
+    setCreateModalVisible(false);
+    setPickMode(true);
+    mapRef.current?.animateToRegion(
+      { latitude: start.latitude, longitude: start.longitude, latitudeDelta: 0.0025, longitudeDelta: 0.0025 },
+      400
+    );
+  };
+
+  const confirmPickMode = () => {
+    if (pickCenter) setPickedCoords(pickCenter);
+    setPickMode(false);
+    setCreateModalVisible(true);
+  };
+
+  const cancelPickMode = () => {
+    setPickMode(false);
+    setCreateModalVisible(true);
+  };
+
   const handleCallOwner = (phone: string) => {
     Linking.openURL(`tel:${phone}`);
   };
@@ -208,6 +233,7 @@ export default function App() {
       <StatusBar barStyle="light-content" />
 
       {/* Top Floating Header & Filter */}
+      {!pickMode && (
       <View style={styles.topContainer}>
         <View style={styles.searchRow}>
           <View style={styles.searchBox}>
@@ -267,6 +293,7 @@ export default function App() {
           </TouchableOpacity>
         </ScrollView>
       </View>
+      )}
 
       {/* Map View */}
       {loading ? (
@@ -280,7 +307,12 @@ export default function App() {
           provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
           style={styles.map}
           initialRegion={initialRegion}
-          onRegionChangeComplete={(region) => loadPins(region)}
+          onRegionChangeComplete={(region) => {
+            loadPins(region);
+            if (pickMode) {
+              setPickCenter({ latitude: region.latitude, longitude: region.longitude });
+            }
+          }}
           showsUserLocation={true}
           showsMyLocationButton={false}
           showsCompass={false}
@@ -304,7 +336,47 @@ export default function App() {
         </MapView>
       )}
 
+      {/* Chế độ đặt ghim thủ công: tâm ngắm trên chính bản đồ chính */}
+      {pickMode && (
+        <>
+          <View pointerEvents="none" style={styles.pickCrosshairWrap}>
+            <View style={styles.pickCrosshairRing} />
+            <View style={styles.pickCrosshairH} />
+            <View style={styles.pickCrosshairV} />
+          </View>
+
+          <View style={styles.pickBanner}>
+            <Text style={styles.pickBannerTitle}>Đặt ghim đúng căn nhà</Text>
+            <Text style={styles.pickBannerHint}>
+              Kéo bản đồ cho tâm ngắm xanh nằm đúng vị trí căn nhà. Không cần đứng tại đó.
+            </Text>
+          </View>
+
+          <View style={styles.pickCard}>
+            <Text style={styles.pickCoordLabel}>Toạ độ tâm ngắm</Text>
+            <Text style={styles.pickCoordValue}>
+              {pickCenter
+                ? `${pickCenter.latitude.toFixed(6)}, ${pickCenter.longitude.toFixed(6)}`
+                : 'Đang xác định...'}
+            </Text>
+            <Text style={styles.pickPrivacy}>
+              🛡️ Bản công khai chỉ hiện vị trí đã làm mờ 50–100m.
+            </Text>
+
+            <View style={styles.pickBtnRow}>
+              <TouchableOpacity style={styles.pickCancelBtn} onPress={cancelPickMode}>
+                <Text style={styles.pickCancelText}>Huỷ</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.pickConfirmBtn} onPress={confirmPickMode}>
+                <Text style={styles.pickConfirmText}>Chọn vị trí này</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </>
+      )}
+
       {/* FAB: Nút định vị GPS và Thêm ghim */}
+      {!pickMode && (
       <View style={styles.fabContainer}>
         <TouchableOpacity style={styles.fabGps} onPress={centerUserLocation}>
           <Text style={styles.fabGpsText}>🎯</Text>
@@ -316,9 +388,10 @@ export default function App() {
           <Text style={styles.fabAddText}>+</Text>
         </TouchableOpacity>
       </View>
+      )}
 
       {/* Bottom Sheet Xem Chi Tiết Ghim */}
-      {selectedPin && (
+      {selectedPin && !pickMode && (
         <View style={styles.bottomSheet}>
           <View style={styles.sheetHeader}>
             <View style={{ flex: 1 }}>
@@ -382,29 +455,12 @@ export default function App() {
 
       {/* Modal Đăng Ghim Cho Chủ Nhà (Ảnh & Video) */}
       <CreatePinModal
-        visible={createModalVisible && !pickerVisible}
+        visible={createModalVisible && !pickMode}
         onClose={() => setCreateModalVisible(false)}
         onSubmit={handleCreateNewPin}
         currentCoords={location}
         pickedCoords={pickedCoords}
-        onRequestPickLocation={() => setPickerVisible(true)}
-      />
-
-      {/* Màn hình tự đặt ghim chính xác trên bản đồ */}
-      <LocationPicker
-        visible={pickerVisible}
-        initial={
-          pickedCoords ??
-          (location
-            ? { latitude: location.latitude, longitude: location.longitude }
-            : { latitude: 21.0335, longitude: 105.7942 })
-        }
-        userLocation={location ? { latitude: location.latitude, longitude: location.longitude } : null}
-        onCancel={() => setPickerVisible(false)}
-        onConfirm={(coords) => {
-          setPickedCoords(coords);
-          setPickerVisible(false);
-        }}
+        onRequestPickLocation={startPickMode}
       />
     </SafeAreaView>
   );
@@ -415,6 +471,80 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0f172a',
   },
+  pickCrosshairWrap: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 56,
+    height: 56,
+    marginLeft: -28,
+    marginTop: -28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickCrosshairRing: {
+    position: 'absolute',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: '#22c55e',
+    backgroundColor: 'rgba(34,197,94,0.15)',
+  },
+  pickCrosshairH: { position: 'absolute', width: 56, height: 2, backgroundColor: '#22c55e' },
+  pickCrosshairV: { position: 'absolute', height: 56, width: 2, backgroundColor: '#22c55e' },
+  pickBanner: {
+    position: 'absolute',
+    top: 12,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(15,23,42,0.94)',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  pickBannerTitle: { color: '#f8fafc', fontSize: 15, fontWeight: '700' },
+  pickBannerHint: { color: '#94a3b8', fontSize: 12, marginTop: 4, lineHeight: 17 },
+  pickCard: {
+    position: 'absolute',
+    bottom: 24,
+    left: 16,
+    right: 16,
+    backgroundColor: '#111c33',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  pickCoordLabel: { color: '#94a3b8', fontSize: 11 },
+  pickCoordValue: {
+    color: '#f1f5f9',
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 2,
+    fontVariant: ['tabular-nums'],
+  },
+  pickPrivacy: { color: '#64748b', fontSize: 11, marginTop: 8, lineHeight: 16 },
+  pickBtnRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  pickCancelBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+  },
+  pickCancelText: { color: '#e2e8f0', fontSize: 13, fontWeight: '600' },
+  pickConfirmBtn: {
+    flex: 1.6,
+    backgroundColor: '#22c55e',
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  pickConfirmText: { color: '#052e16', fontSize: 14, fontWeight: '800' },
   map: {
     width: '100%',
     height: '100%',
