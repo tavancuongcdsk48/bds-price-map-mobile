@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
+import { useGoogleAuth } from './src/hooks/useGoogleAuth';
 
 interface PinItem {
   id: string;
@@ -104,6 +105,9 @@ export default function App() {
   const [selectedPin, setSelectedPin] = useState<PinItem | null>(null);
   const [activeFilter, setActiveFilter] = useState<string>('all');
 
+  // Supabase Google Auth Hook
+  const { user, isAuthenticated, signInWithGoogle, signOut } = useGoogleAuth();
+
   useEffect(() => {
     (async () => {
       try {
@@ -173,10 +177,25 @@ export default function App() {
             <Text style={styles.searchText}>Bản đồ Giá BĐS Việt Nam</Text>
           </View>
           <TouchableOpacity
-            style={styles.avatarButton}
-            onPress={() => Alert.alert('Đăng nhập Google', 'Đăng nhập để xem đầy đủ số điện thoại và đăng ghim mới.')}
+            style={[styles.avatarButton, isAuthenticated && styles.avatarButtonActive]}
+            onPress={() => {
+              if (isAuthenticated) {
+                Alert.alert(
+                  'Tài khoản Google',
+                  `Đã đăng nhập: ${user?.email || 'Người dùng'}\nBạn có muốn đăng xuất không?`,
+                  [
+                    { text: 'Huỷ', style: 'cancel' },
+                    { text: 'Đăng xuất', style: 'destructive', onPress: signOut }
+                  ]
+                );
+              } else {
+                signInWithGoogle();
+              }
+            }}
           >
-            <Text style={styles.avatarText}>G</Text>
+            <Text style={styles.avatarText}>
+              {isAuthenticated ? (user?.email?.charAt(0).toUpperCase() || 'U') : 'G'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -381,13 +400,16 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#10b981',
+    backgroundColor: '#3b82f6',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 10,
     borderWidth: 2,
     borderColor: '#ffffff',
     elevation: 4,
+  },
+  avatarButtonActive: {
+    backgroundColor: '#10b981',
   },
   avatarText: {
     color: '#ffffff',

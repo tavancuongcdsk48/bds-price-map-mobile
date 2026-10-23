@@ -2,6 +2,7 @@
   "expo": {
     "name": "Bản Đồ Giá BĐS",
     "slug": "bds-price-map-mobile",
+    "scheme": "bds-price-map",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -35,7 +36,9 @@
         {
           "locationWhenInUsePermission": "Cho phép ứng dụng sử dụng vị trí của bạn để tìm bất động sản xung quanh."
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-web-browser"
     ]
   }
 }
