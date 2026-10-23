@@ -5,6 +5,9 @@ on:
   push:
     branches: [ main ]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -49,3 +52,12 @@ jobs:
           name: bds-price-map-release-apk
           path: android/app/build/outputs/apk/release/*.apk
           retention-days: 14
+
+      - name: Publish APK to GitHub Release (link tải trực tiếp)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0-apk
+          name: "Bản đồ giá BĐS v1.0.0 (Android APK)"
+          body: "Bản cài đặt Android tự động build từ mã nguồn. Tải file .apk bên dưới và cài vào điện thoại."
+          files: android/app/build/outputs/apk/release/*.apk
+          make_latest: true
