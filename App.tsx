@@ -1538,6 +1538,7 @@ const styles = StyleSheet.create({
     color: '#f8fafc',
     fontSize: 16,
     fontWeight: '700',
+    flexShrink: 1,
   },
   badgeVerified: {
     backgroundColor: 'rgba(16, 185, 129, 0.2)',
