@@ -23,10 +23,12 @@ import {
   createPinInSupabase,
   updatePinPrice,
   fetchPriceHistory,
+  claimLegacyPins,
   PinItem,
   PriceHistoryPoint
 } from './src/services/pinService';
 import { searchPlaces, PlaceResult } from './src/services/placeSearch';
+import { getDeviceId } from './src/lib/deviceId';
 
 type SearchRow = {
   key: string;
@@ -56,6 +58,7 @@ const SEED_PINS: PinItem[] = [
     contact_phone: '0988123456',
     address_text: 'Ngõ 68 Cầu Giấy, Quan Hoa, Cầu Giấy, Hà Nội',
     is_verified: true,
+    is_mine: false,
   },
   {
     id: 'pin-2',
@@ -72,6 +75,7 @@ const SEED_PINS: PinItem[] = [
     contact_phone: '0912345678',
     address_text: 'Số 9 Phạm Văn Đồng, Mai Dịch, Cầu Giấy, Hà Nội',
     is_verified: true,
+    is_mine: false,
   },
   {
     id: 'pin-3',
@@ -87,6 +91,7 @@ const SEED_PINS: PinItem[] = [
     contact_phone: '0903456789',
     address_text: 'Ngõ 44 Trần Thái Tông, Dịch Vọng, Cầu Giấy, Hà Nội',
     is_verified: false,
+    is_mine: false,
   },
   {
     id: 'pin-4',
@@ -103,6 +108,7 @@ const SEED_PINS: PinItem[] = [
     contact_phone: '0977889900',
     address_text: 'Xuân Thủy, Dịch Vọng Hậu, Cầu Giấy, Hà Nội',
     is_verified: true,
+    is_mine: false,
   }
 ];
 
@@ -124,6 +130,9 @@ export default function App() {
   const [searchResults, setSearchResults] = useState<SearchRow[]>([]);
   const [searching, setSearching] = useState(false);
   const searchTimer = useRef<any>(null);
+
+  // Định danh thiết bị: chứng minh quyền sửa giá của ghim mình đã đăng
+  const [deviceId, setDeviceId] = useState<string>('');
 
   // Lịch sử giá của ghim đang mở
   const [priceHistory, setPriceHistory] = useState<PriceHistoryPoint[]>([]);
@@ -166,7 +175,7 @@ export default function App() {
     const minLng = lng - lngDelta / 2;
     const maxLng = lng + lngDelta / 2;
 
-    const serverPins = await fetchPinsInBounds(minLng, minLat, maxLng, maxLat, activeFilter);
+    const serverPins = await fetchPinsInBounds(minLng, minLat, maxLng, maxLat, activeFilter, deviceId);
 
     // null = lỗi kết nối (giữ dữ liệu cũ); [] = vùng này chưa có ghim (hiện trống)
     if (serverPins !== null) {
@@ -176,7 +185,19 @@ export default function App() {
 
   useEffect(() => {
     loadPins();
-  }, [activeFilter, location]);
+  }, [activeFilter, location, deviceId]);
+
+  // Lấy device id một lần khi mở app, nhận các ghim cũ về thiết bị này
+  useEffect(() => {
+    (async () => {
+      const id = await getDeviceId();
+      setDeviceId(id);
+      const claimed = await claimLegacyPins(id);
+      if (claimed > 0) {
+        console.log(`Đã nhận ${claimed} ghim cũ về thiết bị này`);
+      }
+    })();
+  }, []);
 
   // Mỗi khi mở một ghim khác, nạp lịch sử giá của ghim đó
   useEffect(() => {
@@ -207,7 +228,7 @@ export default function App() {
     const defaultUserId = user?.id || '361b7fe7-5586-4239-8329-54f8976b7f07';
 
     // Lưu vào Supabase PostGIS
-    const saved = await createPinInSupabase(data, baseLat, baseLng, defaultUserId);
+    const saved = await createPinInSupabase(data, baseLat, baseLng, defaultUserId, deviceId);
 
     // Refresh lại ghim trên bản đồ
     await loadPins();
@@ -255,7 +276,7 @@ export default function App() {
       return;
     }
     setSearching(true);
-    const [pins, places] = await Promise.all([searchPinsByText(q), searchPlaces(q)]);
+    const [pins, places] = await Promise.all([searchPinsByText(q, deviceId), searchPlaces(q)]);
 
     const rows: SearchRow[] = [
       ...pins.map((pin) => ({
@@ -335,8 +356,16 @@ export default function App() {
       return;
     }
     const newPrice = Math.round(billions * 1000000000);
-    const ok = await updatePinPrice(selectedPin.id, newPrice);
-    if (!ok) {
+    const result = await updatePinPrice(selectedPin.id, newPrice, deviceId);
+
+    if (result === 'not_owner') {
+      Alert.alert(
+        'Không có quyền sửa',
+        'Chỉ người đã đăng ghim này mới được sửa giá. Ghim do người khác đăng thì bạn chỉ xem được.'
+      );
+      return;
+    }
+    if (result === 'failed') {
       Alert.alert('Chưa lưu được', 'Máy chủ từ chối cập nhật giá. Kiểm tra kết nối rồi thử lại.');
       return;
     }
@@ -642,10 +671,14 @@ export default function App() {
           )}
 
           {/* Chủ ghim được sửa giá */}
-          {(selectedPin.user_id ?? DEMO_USER_ID) === (user?.id || DEMO_USER_ID) && (
+          {selectedPin.is_mine ? (
             <TouchableOpacity style={styles.editPriceBtn} onPress={openPriceEditor}>
               <Text style={styles.editPriceText}>✏️ Cập nhật giá rao bán</Text>
             </TouchableOpacity>
+          ) : (
+            <Text style={styles.notOwnerNote}>
+              🔒 Ghim của người khác — chỉ chủ ghim mới sửa được giá
+            </Text>
           )}
 
           {selectedPin.has_video && (
@@ -811,6 +844,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(34,197,94,0.12)',
   },
   editPriceText: { color: '#22c55e', fontSize: 13, fontWeight: '700' },
+  notOwnerNote: { color: '#64748b', fontSize: 11, marginTop: 10, lineHeight: 16 },
 
   priceEditBackdrop: {
     position: 'absolute',

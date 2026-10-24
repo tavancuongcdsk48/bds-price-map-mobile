@@ -11,6 +11,8 @@ bong bóng giá từng căn, và đăng bán nhà của mình trong 60 giây.
 - Thẻ chi tiết: giá, diện tích, đơn giá/m², nút **Gọi** và **Nhắn Zalo** chủ nhà
 - Tự đặt ghim chính xác trên bản đồ (không cần đứng tại căn nhà) bằng tâm ngắm
 - Làm mờ toạ độ công khai 50–100m để bảo vệ dữ liệu cá nhân; toạ độ chính xác chỉ lưu nội bộ
+- Chỉ người đã ghim mới sửa được giá: database kiểm tra `device_id` (khách) hoặc `auth.uid()` (đã đăng nhập)
+- Mỗi lần đổi giá được ghi thành một mốc lịch sử, sẵn sàng cho biểu đồ giá theo tháng/năm
 
 ## Kiến trúc
 
