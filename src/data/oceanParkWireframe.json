@@ -780,5 +780,41 @@
         }
       ]
     }
-  ]
+  ],
+  "highlight_plot": {
+    "code": "NT06-10",
+    "title": "Biệt thự NT06-10",
+    "street": "Đường Ngọc Trai 6",
+    "subdivision": "Đảo Ngọc Trai",
+    "project": "Vinhomes Ocean Park 1",
+    "type": "biet-thu-song-lap",
+    "type_label": "Biệt thự song lập",
+    "area_m2": 153.0,
+    "center": {
+      "latitude": 20.99292,
+      "longitude": 105.948245
+    },
+    "coordinates": [
+      {
+        "latitude": 20.99285,
+        "longitude": 105.9482
+      },
+      {
+        "latitude": 20.99299,
+        "longitude": 105.94823
+      },
+      {
+        "latitude": 20.99297,
+        "longitude": 105.94832
+      },
+      {
+        "latitude": 20.99283,
+        "longitude": 105.94829
+      },
+      {
+        "latitude": 20.99285,
+        "longitude": 105.9482
+      }
+    ]
+  }
 }
