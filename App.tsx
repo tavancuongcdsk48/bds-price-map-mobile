@@ -797,25 +797,25 @@ export default function App() {
             </TouchableOpacity>
           </View>
 
-          {/* Giá làm điểm nhấn, đơn giá và diện tích gom thành nhãn gọn */}
-          <View style={styles.priceBlock}>
-            <Text style={styles.priceHero}>{selectedPin.price_display}</Text>
-            <View style={styles.pillRow}>
-              <View style={styles.pill}>
-                <Text style={styles.pillText}>{selectedPin.price_per_m2_display}</Text>
-              </View>
-              <View style={styles.pill}>
-                <Text style={styles.pillText}>{selectedPin.area_m2} m²</Text>
-              </View>
-              <View style={styles.pill}>
-                <Text style={styles.pillText}>
-                  {selectedPin.property_type === 'can-ho'
-                    ? 'Căn hộ'
-                    : selectedPin.property_type === 'nha-pho'
-                    ? 'Nhà phố'
-                    : 'Đất nền'}
-                </Text>
-              </View>
+          {/* Ba ô lớn: Giá chủ nhà rao · Đơn giá/m² · Diện tích */}
+          <View style={styles.priceRow}>
+            <View style={styles.priceBox}>
+              <Text style={styles.priceLabel} numberOfLines={1}>GIÁ CHỦ NHÀ RAO</Text>
+              <Text style={styles.priceValue} numberOfLines={1} adjustsFontSizeToFit>
+                {selectedPin.price_display}
+              </Text>
+            </View>
+            <View style={styles.priceBox}>
+              <Text style={styles.priceLabel} numberOfLines={1}>ĐƠN GIÁ / M²</Text>
+              <Text style={styles.unitPriceValue} numberOfLines={1} adjustsFontSizeToFit>
+                {selectedPin.price_per_m2_display}
+              </Text>
+            </View>
+            <View style={styles.priceBox}>
+              <Text style={styles.priceLabel} numberOfLines={1}>DIỆN TÍCH</Text>
+              <Text style={styles.areaValue} numberOfLines={1} adjustsFontSizeToFit>
+                {selectedPin.area_m2} m²
+              </Text>
             </View>
           </View>
 
@@ -876,27 +876,35 @@ export default function App() {
             </View>
           )}
 
-          {/* Lưu ghim để theo dõi biến động giá */}
-          <TouchableOpacity
-            style={[styles.saveBtn, selectedPin.is_saved && styles.saveBtnActive]}
-            onPress={() => handleToggleSave(selectedPin)}
-          >
-            <Text style={[styles.saveBtnText, selectedPin.is_saved && styles.saveBtnTextActive]}>
-              {selectedPin.is_saved ? '💚 Đã lưu — đang theo dõi giá' : '🤍 Lưu ghim để theo dõi giá'}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Hai nút quản lý ghim — chỉ hiện với chủ ghim */}
-          {selectedPin.is_mine ? (
-            <View style={styles.btnRow}>
-              <TouchableOpacity style={[styles.actionBtn, styles.btnNeutral]} onPress={openPriceEditor}>
-                <Text style={styles.btnNeutralText}>✏️  Sửa giá</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.actionBtn, styles.btnDanger]} onPress={handleDeletePin}>
-                <Text style={styles.btnDangerText}>🗑  Xoá ghim</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
+          {/* Sửa / Xoá / Lưu ghim trên cùng một dòng */}
+          <View style={styles.btnRow}>
+            {selectedPin.is_mine ? (
+              <>
+                <TouchableOpacity style={[styles.actionBtn, styles.btnNeutral]} onPress={openPriceEditor}>
+                  <Text style={styles.btnSmallText} numberOfLines={1} adjustsFontSizeToFit>
+                    ✏️ Sửa
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.actionBtn, styles.btnDanger]} onPress={handleDeletePin}>
+                  <Text style={styles.btnDangerText} numberOfLines={1} adjustsFontSizeToFit>
+                    🗑 Xoá
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : null}
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.btnSave, selectedPin.is_saved && styles.btnSaveActive]}
+              onPress={() => handleToggleSave(selectedPin)}
+            >
+              <Text
+                style={[styles.btnSaveText, selectedPin.is_saved && styles.btnSaveTextActive]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                {selectedPin.is_saved ? '💚 Đã lưu' : '🤍 Lưu ghim'}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Liên hệ chủ nhà */}
           <View style={styles.btnRow}>
@@ -1316,7 +1324,12 @@ const styles = StyleSheet.create({
 
   mediaWrap: { marginTop: 10 },
 
-  btnRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  btnRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  btnSmallText: { color: '#e2e8f0', fontSize: 13, fontWeight: '700' },
+  btnSave: { backgroundColor: '#1e293b', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
+  btnSaveActive: { backgroundColor: 'rgba(34,197,94,0.14)', borderColor: '#22c55e' },
+  btnSaveText: { color: '#e2e8f0', fontSize: 13, fontWeight: '700' },
+  btnSaveTextActive: { color: '#4ade80' },
   actionBtn: { flex: 1, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   btnNeutral: { backgroundColor: '#1e293b', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
   btnNeutralText: { color: '#e2e8f0', fontSize: 13, fontWeight: '700' },
@@ -1572,7 +1585,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
   },
   priceBox: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   priceLabel: {
     color: '#94a3b8',
@@ -1581,19 +1596,19 @@ const styles = StyleSheet.create({
   },
   priceValue: {
     color: '#10b981',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
     marginTop: 2,
   },
   unitPriceValue: {
     color: '#38bdf8',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
     marginTop: 2,
   },
   areaValue: {
     color: '#f8fafc',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
     marginTop: 2,
   },
