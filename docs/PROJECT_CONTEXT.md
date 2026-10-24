@@ -46,8 +46,33 @@
 
 ## 4. Dữ liệu
 
-Bảng trong `public` thuộc app: `profiles`, `pins`, `pin_price_history`, `pin_media`, `pin_saves`.
+Bảng trong `public` thuộc app: `profiles`, `pins`, `pin_price_history`, `pin_media`, `pin_saves`,
+`price_observations`, `price_index_monthly`.
 Tất cả nằm chung DB với schema DMS (`ad_analyses`, `meta_ad_records`, …) — **đụng bảng nào chỉ sửa bảng đó**.
+
+### 4.1 Lịch sử giá bất biến (từ 2026-10-24)
+
+Nguyên tắc: **lịch sử giá thuộc về VỊ TRÍ, không thuộc về cái ghim.** Chủ xoá ghim hay đổi giá
+đều không được làm mất lịch sử của vị trí đó.
+
+| Bảng | Vai trò | Quy tắc |
+|---|---|---|
+| `price_observations` | Sổ cái giá bất biến (append-only) | Không UPDATE, không DELETE. `pin_id` FK `ON DELETE SET NULL`. Mỗi dòng neo vào `cell_id` (ô lưới ~133 m tính từ `exact_geom`), `alley_key` (địa chỉ đã bỏ dấu), `property_type`, `price_vnd`, `price_per_m2` |
+| `price_index_monthly` | Ảnh chụp cuối mỗi tháng theo `(cell_id, property_type)` | `n_pins`, `median_price_per_m2`, `p25`, `p75`, `min/max`. Có carry-forward: tháng không ai đổi giá vẫn có điểm |
+
+- Trigger trên `pins`: `AFTER INSERT` → `created`; `AFTER UPDATE` khi đổi `price_vnd`/`area_m2` → `owner_edit`;
+  đổi `status` sang `sold` → `marked_sold`; `BEFORE DELETE` → `pin_removed` (giá cuối vẫn nằm trong sổ).
+- Dùng `clock_timestamp()` (không phải `now()`) để hai lần đổi giá trong cùng transaction vẫn có thứ tự đúng.
+- `pin_price_history` (bảng cũ) đã đổi FK sang `ON DELETE SET NULL`, giữ lại để app cũ không vỡ.
+- `refresh_price_index_monthly(36)` chạy qua **pg_cron** `price_index_monthly_refresh` lúc **00:20 hằng ngày**.
+- Bảo mật: `price_observations` và `price_index_monthly` bật RLS **không có policy** → client không đọc trực tiếp.
+  Chỉ đọc qua RPC `SECURITY DEFINER` trả số tổng hợp, **không trả toạ độ**.
+
+RPC đọc: `get_area_price_history(lat,lng,radius,type,months)` · `get_price_at_location(lat,lng,radius,type)` ·
+`get_cell_price_history(cell_id,type,months)` · `get_pin_price_timeline(pin_id)`.
+
+Migration: `supabase/migrations/20261024_price_history_immutable.sql` + `..._backfill.sql`.
+Kiểm chứng: `python scripts/verify_price_history.py` (tạo ghim → đổi giá 2 lần → xoá ghim → lịch sử còn nguyên, PASS/FAIL từng bước).
 
 `pins` (cột chính): `id, user_id → profiles(id), title, description, property_type(nha-pho|can-ho|dat-nen|biet-thu),
 price_vnd, area_m2, price_per_m2 (generated), public_geom/exact_geom geography(Point,4326), address_text,

@@ -255,6 +255,51 @@ export async function fetchPriceHistory(pinId: string): Promise<PriceHistoryPoin
   }
 }
 
+// 5b. Lịch sử giá theo THÁNG của KHU VỰC — đọc từ sổ cái bất biến (price_observations).
+//     Khác fetchPriceHistory: dữ liệu này còn nguyên kể cả khi chủ nhà đã xoá ghim
+//     hoặc đổi giá, vì nó neo vào vị trí (ô lưới ~130m) chứ không neo vào cái ghim.
+export interface AreaPricePoint {
+  month: string;          // '2026-10-01'
+  n_pins: number;         // số ghim đang treo trong tháng đó ở khu vực
+  median_ppm2: number;    // trung vị giá/m² của khu vực
+  p25: number;
+  p75: number;
+}
+
+export async function fetchAreaPriceHistory(
+  latitude: number,
+  longitude: number,
+  radiusM: number = 400,
+  propertyType?: string | null,
+  months: number = 12
+): Promise<AreaPricePoint[]> {
+  try {
+    const { data, error } = await supabase.rpc('get_area_price_history', {
+      p_lat: latitude,
+      p_lng: longitude,
+      p_radius_m: radiusM,
+      p_type: propertyType ?? null,
+      p_months: months,
+    });
+
+    if (error) {
+      console.warn('Lỗi lấy lịch sử giá khu vực:', error.message);
+      return [];
+    }
+
+    return ((data as any[]) || []).map((r) => ({
+      month: r.month,
+      n_pins: Number(r.n_pins || 0),
+      median_ppm2: Number(r.median_ppm2 || 0),
+      p25: Number(r.p25 || 0),
+      p75: Number(r.p75 || 0),
+    }));
+  } catch (err) {
+    console.warn('Lỗi lịch sử giá khu vực:', err);
+    return [];
+  }
+}
+
 // 6. Lưu / bỏ lưu một ghim để theo dõi biến động giá
 export async function toggleSavePin(
   pinId: string

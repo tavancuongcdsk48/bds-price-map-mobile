@@ -35,6 +35,7 @@ import {
   createPinInSupabase,
   updatePinPrice,
   fetchPriceHistory,
+  fetchAreaPriceHistory,
   claimDemoPins,
   deletePin,
   toggleSavePin,
@@ -47,7 +48,8 @@ import {
   MyPin,
   SavedPin,
   PinItem,
-  PriceHistoryPoint
+  PriceHistoryPoint,
+  AreaPricePoint
 } from './src/services/pinService';
 import { searchPlaces, PlaceResult } from './src/services/placeSearch';
 import { maskPhone } from './src/lib/mediaRules';
@@ -155,6 +157,8 @@ export default function App() {
 
   // Lịch sử giá của ghim đang mở
   const [priceHistory, setPriceHistory] = useState<PriceHistoryPoint[]>([]);
+  // Lịch sử giá theo tháng của KHU VỰC (không phụ thuộc ghim còn hay đã xoá)
+  const [areaHistory, setAreaHistory] = useState<AreaPricePoint[]>([]);
   const [priceEditVisible, setPriceEditVisible] = useState(false);
   const [myPinsVisible, setMyPinsVisible] = useState(false);
   const [myPins, setMyPins] = useState<MyPin[]>([]);
@@ -225,8 +229,19 @@ export default function App() {
       setPinMedia([]);
       fetchPinMedia(selectedPin.id).then(setPinMedia);
       loadPriceHistory(selectedPin.id);
+      // Giá khu vực: đọc từ sổ cái bất biến, sống độc lập với vòng đời của ghim này
+      fetchAreaPriceHistory(
+        selectedPin.latitude,
+        selectedPin.longitude,
+        400,
+        selectedPin.property_type,
+        12
+      )
+        .then(setAreaHistory)
+        .catch(() => setAreaHistory([]));
     } else {
       setPriceHistory([]);
+      setAreaHistory([]);
     }
   }, [selectedPin?.id]);
 
@@ -1061,6 +1076,49 @@ export default function App() {
             </View>
           )}
 
+
+          {/* Giá/m² của KHU VỰC theo từng tháng — dữ liệu còn nguyên kể cả khi
+              chủ nhà xoá ghim hoặc đổi giá, vì nó neo vào vị trí chứ không neo vào ghim. */}
+          {areaHistory.length >= 2 && (
+            <View style={styles.historyBox}>
+              <View style={styles.historyHead}>
+                <Text style={styles.historyTitle}>Giá/m² khu vực · 400 m</Text>
+                <Text style={styles.historyCount}>
+                  {areaHistory[areaHistory.length - 1].n_pins} ghim đang treo
+                </Text>
+              </View>
+              <View style={styles.chartRow}>
+                {areaHistory.slice(-6).map((h, idx, arr) => {
+                  const max = Math.max(...arr.map((x) => x.median_ppm2));
+                  const min = Math.min(...arr.map((x) => x.median_ppm2));
+                  const ratio = max === min ? 0.6 : 0.3 + ((h.median_ppm2 - min) / (max - min)) * 0.7;
+                  const isLast = idx === arr.length - 1;
+                  const [yy, mm] = h.month.split('-');
+                  return (
+                    <View key={h.month} style={styles.chartCol}>
+                      <Text
+                        style={[styles.chartValue, isLast && styles.chartValueLast]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.7}
+                      >
+                        {`${Math.round(h.median_ppm2 / 1000000)}tr`}
+                      </Text>
+                      <View
+                        style={[
+                          styles.chartBar,
+                          { height: Math.round(40 * ratio), backgroundColor: isLast ? '#38bdf8' : '#1e3a5f' },
+                        ]}
+                      />
+                      <Text style={styles.chartLabel} numberOfLines={1}>
+                        {`T${Number(mm)}/${yy.slice(2)}`}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
 
           {/* Liên hệ chủ nhà — khách chưa đăng nhập chỉ thấy số đã ẩn 4 số cuối */}
           <Text style={styles.contactHint}>
