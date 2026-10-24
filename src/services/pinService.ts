@@ -48,8 +48,7 @@ export async function fetchPinsInBounds(
   minLat: number,
   maxLng: number,
   maxLat: number,
-  propertyType?: string,
-  deviceId?: string | null
+  propertyType?: string
 ): Promise<PinItem[] | null> {
   try {
     const { data, error } = await supabase.rpc('get_pins_in_bounds', {
@@ -58,7 +57,6 @@ export async function fetchPinsInBounds(
       max_lng: maxLng,
       max_lat: maxLat,
       p_type: propertyType && propertyType !== 'all' ? propertyType : null,
-      p_device_id: deviceId || null,
     });
 
     if (error) {
@@ -75,14 +73,11 @@ export async function fetchPinsInBounds(
 }
 
 // 2. Tìm ghim theo tên / địa chỉ cho thanh tìm kiếm
-export async function searchPinsByText(q: string, deviceId?: string | null): Promise<PinItem[]> {
+export async function searchPinsByText(q: string): Promise<PinItem[]> {
   const keyword = q.trim();
   if (keyword.length < 2) return [];
   try {
-    const { data, error } = await supabase.rpc('search_pins', {
-      p_q: keyword,
-      p_device_id: deviceId || null,
-    });
+    const { data, error } = await supabase.rpc('search_pins', { p_q: keyword });
     if (error) {
       console.warn('Lỗi search_pins:', error.message);
       return [];
@@ -99,8 +94,7 @@ export async function createPinInSupabase(
   data: NewPinData,
   lat: number,
   lng: number,
-  userId: string,
-  deviceId?: string | null
+  userId: string
 ): Promise<boolean> {
   try {
     // Làm mờ toạ độ công khai 50-80m để bảo vệ quyền riêng tư
@@ -114,7 +108,6 @@ export async function createPinInSupabase(
       .from('pins')
       .insert({
         user_id: userId,
-        device_id: deviceId || null,
         title: data.title,
         property_type: data.property_type,
         price_vnd: data.price_vnd,
@@ -152,23 +145,20 @@ export async function createPinInSupabase(
 
 // 4. Chủ ghim sửa giá — database kiểm tra đúng thiết bị đã ghim mới cho sửa.
 //    Trigger DB tự ghi vào lịch sử giá.
-export type PriceUpdateResult = 'ok' | 'not_owner' | 'failed';
+export type PriceUpdateResult = 'ok' | 'not_owner' | 'not_authenticated' | 'failed';
 
-export async function updatePinPrice(
-  pinId: string,
-  priceVnd: number,
-  deviceId: string
-): Promise<PriceUpdateResult> {
+export async function updatePinPrice(pinId: string, priceVnd: number): Promise<PriceUpdateResult> {
   try {
     const { error } = await supabase.rpc('update_pin_price', {
       p_pin_id: pinId,
       p_price: Math.round(priceVnd),
-      p_device_id: deviceId,
     });
 
     if (error) {
-      if (String(error.message || '').includes('not_pin_owner')) return 'not_owner';
-      console.warn('Lỗi sửa giá:', error.message);
+      const msg = String(error.message || '');
+      if (msg.includes('not_pin_owner')) return 'not_owner';
+      if (msg.includes('not_authenticated')) return 'not_authenticated';
+      console.warn('Lỗi sửa giá:', msg);
       return 'failed';
     }
     return 'ok';
@@ -178,17 +168,35 @@ export async function updatePinPrice(
   }
 }
 
-// 4b. Nhận các ghim cũ (tạo trước khi có device_id) về thiết bị này
-export async function claimLegacyPins(deviceId: string): Promise<number> {
+// 4b. Xoá ghim — chỉ chủ tài khoản Google đã đăng ghim
+export async function deletePin(pinId: string): Promise<PriceUpdateResult> {
   try {
-    const { data, error } = await supabase.rpc('claim_legacy_pins', { p_device_id: deviceId });
+    const { error } = await supabase.rpc('delete_pin', { p_pin_id: pinId });
     if (error) {
-      console.warn('Lỗi nhận ghim cũ:', error.message);
+      const msg = String(error.message || '');
+      if (msg.includes('not_pin_owner')) return 'not_owner';
+      if (msg.includes('not_authenticated')) return 'not_authenticated';
+      console.warn('Lỗi xoá ghim:', msg);
+      return 'failed';
+    }
+    return 'ok';
+  } catch (err) {
+    console.warn('Lỗi xoá ghim:', err);
+    return 'failed';
+  }
+}
+
+// 4c. Sau khi đăng nhập Google: nhận các ghim demo cũ về tài khoản này
+export async function claimDemoPins(): Promise<number> {
+  try {
+    const { data, error } = await supabase.rpc('claim_demo_pins');
+    if (error) {
+      console.warn('Lỗi nhận ghim demo:', error.message);
       return 0;
     }
     return Number(data) || 0;
   } catch (err) {
-    console.warn('Lỗi claim_legacy_pins:', err);
+    console.warn('Lỗi claim_demo_pins:', err);
     return 0;
   }
 }

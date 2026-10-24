@@ -17,18 +17,19 @@ import MapView, { Marker, PROVIDER_GOOGLE, PROVIDER_DEFAULT, Region } from 'reac
 import * as Location from 'expo-location';
 import { useGoogleAuth } from './src/hooks/useGoogleAuth';
 import { CreatePinModal, NewPinData } from './src/components/CreatePinModal';
+import { AuthModal } from './src/components/AuthModal';
 import {
   fetchPinsInBounds,
   searchPinsByText,
   createPinInSupabase,
   updatePinPrice,
   fetchPriceHistory,
-  claimLegacyPins,
+  claimDemoPins,
+  deletePin,
   PinItem,
   PriceHistoryPoint
 } from './src/services/pinService';
 import { searchPlaces, PlaceResult } from './src/services/placeSearch';
-import { getDeviceId } from './src/lib/deviceId';
 
 type SearchRow = {
   key: string;
@@ -131,17 +132,15 @@ export default function App() {
   const [searching, setSearching] = useState(false);
   const searchTimer = useRef<any>(null);
 
-  // Định danh thiết bị: chứng minh quyền sửa giá của ghim mình đã đăng
-  const [deviceId, setDeviceId] = useState<string>('');
-
   // Lịch sử giá của ghim đang mở
   const [priceHistory, setPriceHistory] = useState<PriceHistoryPoint[]>([]);
   const [priceEditVisible, setPriceEditVisible] = useState(false);
+  const [authModalVisible, setAuthModalVisible] = useState(false);
   const [priceInput, setPriceInput] = useState('');
   const [pinsList, setPinsList] = useState<PinItem[]>(SEED_PINS);
 
   // Supabase Google Auth Hook
-  const { user, isAuthenticated, signInWithGoogle, signOut } = useGoogleAuth();
+  const { user, isAuthenticated, signInWithGoogle, signOut, authError } = useGoogleAuth();
 
   // Khởi tạo GPS
   useEffect(() => {
@@ -175,7 +174,7 @@ export default function App() {
     const minLng = lng - lngDelta / 2;
     const maxLng = lng + lngDelta / 2;
 
-    const serverPins = await fetchPinsInBounds(minLng, minLat, maxLng, maxLat, activeFilter, deviceId);
+    const serverPins = await fetchPinsInBounds(minLng, minLat, maxLng, maxLat, activeFilter);
 
     // null = lỗi kết nối (giữ dữ liệu cũ); [] = vùng này chưa có ghim (hiện trống)
     if (serverPins !== null) {
@@ -185,19 +184,19 @@ export default function App() {
 
   useEffect(() => {
     loadPins();
-  }, [activeFilter, location, deviceId]);
+  }, [activeFilter, location, user?.id]);
 
-  // Lấy device id một lần khi mở app, nhận các ghim cũ về thiết bị này
+  // Sau khi đăng nhập Google: nhận các ghim demo cũ về tài khoản này rồi tải lại
   useEffect(() => {
+    if (!isAuthenticated) return;
     (async () => {
-      const id = await getDeviceId();
-      setDeviceId(id);
-      const claimed = await claimLegacyPins(id);
+      const claimed = await claimDemoPins();
       if (claimed > 0) {
-        console.log(`Đã nhận ${claimed} ghim cũ về thiết bị này`);
+        console.log(`Đã chuyển ${claimed} ghim demo về tài khoản ${user?.email || user?.id}`);
       }
+      await loadPins();
     })();
-  }, []);
+  }, [isAuthenticated, user?.id]);
 
   // Mỗi khi mở một ghim khác, nạp lịch sử giá của ghim đó
   useEffect(() => {
@@ -225,10 +224,13 @@ export default function App() {
     // Ưu tiên toạ độ người đăng tự chọn, sau đó mới tới GPS
     const baseLat = pickedCoords?.latitude ?? (location ? location.latitude : 21.0335);
     const baseLng = pickedCoords?.longitude ?? (location ? location.longitude : 105.7942);
-    const defaultUserId = user?.id || '361b7fe7-5586-4239-8329-54f8976b7f07';
+    if (!user?.id) {
+      setAuthModalVisible(true);
+      return;
+    }
 
     // Lưu vào Supabase PostGIS
-    const saved = await createPinInSupabase(data, baseLat, baseLng, defaultUserId, deviceId);
+    const saved = await createPinInSupabase(data, baseLat, baseLng, user.id);
 
     // Refresh lại ghim trên bản đồ
     await loadPins();
@@ -242,6 +244,41 @@ export default function App() {
         'Máy chủ từ chối lưu ghim. Kiểm tra kết nối Wi-Fi tới Supabase rồi thử lại.'
       );
     }
+  };
+
+  const handleDeletePin = () => {
+    const pin = selectedPin;
+    if (!pin) return;
+
+    Alert.alert(
+      'Xoá ghim này?',
+      `${pin.title}\nGhim sẽ biến mất khỏi bản đồ. Lịch sử giá vẫn được giữ lại.`,
+      [
+        { text: 'Huỷ', style: 'cancel' },
+        {
+          text: 'Xoá ghim',
+          style: 'destructive',
+          onPress: async () => {
+            const result = await deletePin(pin.id);
+            if (result === 'ok') {
+              setSelectedPin(null);
+              setPinsList((prev) => prev.filter((x) => x.id !== pin.id));
+              await loadPins();
+              return;
+            }
+            if (result === 'not_authenticated') {
+              setAuthModalVisible(true);
+              return;
+            }
+            if (result === 'not_owner') {
+              Alert.alert('Không có quyền xoá', 'Chỉ tài khoản đã đăng ghim này mới được xoá.');
+              return;
+            }
+            Alert.alert('Chưa xoá được', 'Máy chủ từ chối. Kiểm tra kết nối rồi thử lại.');
+          },
+        },
+      ]
+    );
   };
 
   const startPickMode = () => {
@@ -276,7 +313,7 @@ export default function App() {
       return;
     }
     setSearching(true);
-    const [pins, places] = await Promise.all([searchPinsByText(q, deviceId), searchPlaces(q)]);
+    const [pins, places] = await Promise.all([searchPinsByText(q), searchPlaces(q)]);
 
     const rows: SearchRow[] = [
       ...pins.map((pin) => ({
@@ -356,8 +393,12 @@ export default function App() {
       return;
     }
     const newPrice = Math.round(billions * 1000000000);
-    const result = await updatePinPrice(selectedPin.id, newPrice, deviceId);
+    const result = await updatePinPrice(selectedPin.id, newPrice);
 
+    if (result === 'not_authenticated') {
+      setAuthModalVisible(true);
+      return;
+    }
     if (result === 'not_owner') {
       Alert.alert(
         'Không có quyền sửa',
@@ -438,7 +479,7 @@ export default function App() {
                   ]
                 );
               } else {
-                signInWithGoogle();
+                setAuthModalVisible(true);
               }
             }}
           >
@@ -595,7 +636,13 @@ export default function App() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.fabAdd}
-          onPress={() => setCreateModalVisible(true)}
+          onPress={() => {
+            if (!isAuthenticated) {
+              setAuthModalVisible(true);
+              return;
+            }
+            setCreateModalVisible(true);
+          }}
         >
           <Text style={styles.fabAddText}>+</Text>
         </TouchableOpacity>
@@ -672,12 +719,17 @@ export default function App() {
 
           {/* Chủ ghim được sửa giá */}
           {selectedPin.is_mine ? (
-            <TouchableOpacity style={styles.editPriceBtn} onPress={openPriceEditor}>
-              <Text style={styles.editPriceText}>✏️ Cập nhật giá rao bán</Text>
-            </TouchableOpacity>
+            <View style={styles.ownerActions}>
+              <TouchableOpacity style={styles.editPriceBtn} onPress={openPriceEditor}>
+                <Text style={styles.editPriceText}>✏️ Sửa giá</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.deletePinBtn} onPress={handleDeletePin}>
+                <Text style={styles.deletePinText}>🗑 Xoá ghim</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             <Text style={styles.notOwnerNote}>
-              🔒 Ghim của người khác — chỉ chủ ghim mới sửa được giá
+              🔒 Ghim của tài khoản khác — chỉ chủ ghim mới sửa hoặc xoá được
             </Text>
           )}
 
@@ -708,6 +760,23 @@ export default function App() {
           </View>
         </View>
       )}
+
+      {/* Đăng nhập tài khoản: Google hoặc email/mật khẩu */}
+      <AuthModal
+        visible={authModalVisible}
+        onClose={() => setAuthModalVisible(false)}
+        onGoogle={async () => {
+          const ok = await signInWithGoogle();
+          if (!ok && authError) {
+            Alert.alert('Đăng nhập Google chưa xong', authError);
+          }
+          return ok;
+        }}
+        onSignedIn={async () => {
+          setAuthModalVisible(false);
+          await loadPins();
+        }}
+      />
 
       {/* Cập nhật giá — mỗi lần lưu là một mốc lịch sử giá */}
       {priceEditVisible && (
@@ -844,6 +913,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(34,197,94,0.12)',
   },
   editPriceText: { color: '#22c55e', fontSize: 13, fontWeight: '700' },
+  ownerActions: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  deletePinBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: 'rgba(248,113,113,0.5)',
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: 'center',
+    backgroundColor: 'rgba(248,113,113,0.12)',
+  },
+  deletePinText: { color: '#f87171', fontSize: 13, fontWeight: '700' },
   notOwnerNote: { color: '#64748b', fontSize: 11, marginTop: 10, lineHeight: 16 },
 
   priceEditBackdrop: {

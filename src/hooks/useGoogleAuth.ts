@@ -7,10 +7,13 @@ import { Session, User } from '@supabase/supabase-js';
 // Cần gọi để đóng trình duyệt auth sau khi nhận callback
 WebBrowser.maybeCompleteAuthSession();
 
+const SCHEME = 'vutruchuyennhuong';
+
 export function useGoogleAuth() {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Lấy session hiện tại khi mở app
   useEffect(() => {
@@ -29,12 +32,13 @@ export function useGoogleAuth() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Hàm kích hoạt đăng nhập Google 1 chạm
-  const signInWithGoogle = async () => {
+  // Hàm kích hoạt đăng nhập Google 1 chạm. Trả về true nếu đăng nhập thành công.
+  const signInWithGoogle = async (): Promise<boolean> => {
+    setAuthError(null);
     try {
       setLoading(true);
       const redirectUrl = AuthSession.makeRedirectUri({
-        scheme: 'bds-price-map',
+        scheme: SCHEME,
         path: 'auth/callback',
       });
 
@@ -54,9 +58,15 @@ export function useGoogleAuth() {
 
       if (result.type === 'success' && result.url) {
         // Trích xuất mã xác thực từ redirect URL
-        const params = new URLSearchParams(result.url.split('#')[1] || result.url.split('?')[1]);
+        const hashPart = result.url.includes('#') ? result.url.split('#')[1] : '';
+        const queryPart = result.url.includes('?') ? result.url.split('?')[1] : '';
+        const params = new URLSearchParams(hashPart || queryPart);
+
         const accessToken = params.get('access_token');
         const refreshToken = params.get('refresh_token');
+        const errorDescription = params.get('error_description');
+
+        if (errorDescription) throw new Error(errorDescription);
 
         if (accessToken && refreshToken) {
           const { error: setSessionError } = await supabase.auth.setSession({
@@ -64,10 +74,26 @@ export function useGoogleAuth() {
             refresh_token: refreshToken,
           });
           if (setSessionError) throw setSessionError;
+          return true;
         }
+        throw new Error('Không nhận được token đăng nhập từ Google.');
       }
+
+      if (result.type === 'cancel' || result.type === 'dismiss') {
+        setAuthError('Bạn đã huỷ đăng nhập Google.');
+        return false;
+      }
+      return false;
     } catch (err: any) {
-      console.warn('Lỗi đăng nhập Google:', err.message || err);
+      const msg = String(err?.message || err || '');
+      const lower = msg.toLowerCase();
+      const friendly =
+        lower.includes('provider is not enabled') || lower.includes('unsupported provider')
+          ? 'Google chưa được bật trong Supabase Auth. Cần thêm Client ID/Secret từ Google Cloud.'
+          : msg || 'Đăng nhập Google thất bại.';
+      console.warn('Lỗi đăng nhập Google:', friendly);
+      setAuthError(friendly);
+      return false;
     } finally {
       setLoading(false);
     }
@@ -88,6 +114,7 @@ export function useGoogleAuth() {
     session,
     user,
     loading,
+    authError,
     signInWithGoogle,
     signOut,
     isAuthenticated: !!user,
