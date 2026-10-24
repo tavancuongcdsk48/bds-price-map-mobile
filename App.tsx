@@ -14,6 +14,13 @@ import {
   TextInput
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, PROVIDER_DEFAULT, Region } from 'react-native-maps';
+
+/** 3_300_000_000 → "3,3 tỷ"; 2_450_000_000 → "2,45 tỷ" */
+const formatTy = (vnd: number) => {
+  const n = vnd / 1_000_000_000;
+  const s = (Math.round(n * 100) / 100).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  return s.replace('.', ',') + ' tỷ';
+};
 import * as Location from 'expo-location';
 import { useGoogleAuth } from './src/hooks/useGoogleAuth';
 import { CreatePinModal, NewPinData } from './src/components/CreatePinModal';
@@ -797,7 +804,7 @@ export default function App() {
                   const ratio = max === min ? 0.6 : 0.3 + ((h.price_vnd - min) / (max - min)) * 0.7;
                   const isLast = idx === arr.length - 1;
                   const d = new Date(h.created_at);
-                  const price = (h.price_vnd / 1000000000).toFixed(1).replace('.', ',') + ' tỷ';
+                  const price = formatTy(h.price_vnd);
                   return (
                     <View key={`${h.created_at}-${idx}`} style={styles.chartCol}>
                       <Text
