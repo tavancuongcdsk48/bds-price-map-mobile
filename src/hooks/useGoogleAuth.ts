@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
+import * as Linking from 'expo-linking';
 import { supabase } from '../lib/supabase';
 import { Session, User } from '@supabase/supabase-js';
 
@@ -37,10 +38,9 @@ export function useGoogleAuth() {
     setAuthError(null);
     try {
       setLoading(true);
-      const redirectUrl = AuthSession.makeRedirectUri({
-        scheme: SCHEME,
-        path: 'auth/callback',
-      });
+      // Expo Go trả về exp://192.168.x.x:8081/--/auth/callback, bản cài thật trả về
+      // vutruchuyennhuong://auth/callback. Dùng Linking.createURL để tự chọn đúng.
+      const redirectUrl = Linking.createURL('/auth/callback');
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
