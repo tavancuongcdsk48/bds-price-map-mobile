@@ -1080,7 +1080,7 @@ export default function App() {
           )}
 
           {/* Layer Vector GPS: Bo viền ranh giới & trục đường mặt bằng Ocean Park */}
-          {oceanParkLayout.lines.map((l) => (
+          {(oceanParkLayout.lines as any[] || []).map((l: any) => (
             <Polyline
               key={l.id}
               coordinates={l.coordinates}
@@ -1090,7 +1090,7 @@ export default function App() {
           ))}
 
           {/* Layer Vector GPS: Bo viền từng lô biệt thự Đảo Ngọc Trai */}
-          {oceanParkLayout.plots.map((p) => (
+          {(oceanParkLayout.plots as any[] || []).map((p: any) => (
             <Polygon
               key={p.code}
               coordinates={p.coordinates}
@@ -1101,7 +1101,7 @@ export default function App() {
           ))}
 
           {/* Layer Vector GPS: Bo viền layout các khối toà chung cư (Sapphire / Masteri) */}
-          {oceanParkLayout.buildings.map((b) => (
+          {(oceanParkLayout.buildings as any[] || []).map((b: any) => (
             <Polygon
               key={b.code}
               coordinates={b.coordinates}
