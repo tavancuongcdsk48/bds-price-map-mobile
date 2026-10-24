@@ -63,6 +63,10 @@ Nguyên tắc: **lịch sử giá thuộc về VỊ TRÍ, không thuộc về c�
 - Trigger trên `pins`: `AFTER INSERT` → `created`; `AFTER UPDATE` khi đổi `price_vnd`/`area_m2` → `owner_edit`;
   đổi `status` sang `sold` → `marked_sold`; `BEFORE DELETE` → `pin_removed` (giá cuối vẫn nằm trong sổ).
 - Dùng `clock_timestamp()` (không phải `now()`) để hai lần đổi giá trong cùng transaction vẫn có thứ tự đúng.
+- **Ghim bị xoá vẫn để lại dấu trong chuỗi thời gian:** observation của căn đã gỡ còn được tính vào
+  `get_area_price_history` / `get_cell_price_history` / `price_index_monthly` **tới hết tháng bị gỡ**;
+  từ tháng sau mới rời chỉ số. Ngược lại `get_price_at_location` (ảnh chụp thị trường hiện tại) **loại** căn đã gỡ —
+  phân biệt rõ "thị trường hôm nay" và "lịch sử giá của vị trí".
 - `pin_price_history` (bảng cũ) đã đổi FK sang `ON DELETE SET NULL`, giữ lại để app cũ không vỡ.
 - `refresh_price_index_monthly(36)` chạy qua **pg_cron** `price_index_monthly_refresh` lúc **00:20 hằng ngày**.
 - Bảo mật: `price_observations` và `price_index_monthly` bật RLS **không có policy** → client không đọc trực tiếp.
@@ -71,8 +75,10 @@ Nguyên tắc: **lịch sử giá thuộc về VỊ TRÍ, không thuộc về c�
 RPC đọc: `get_area_price_history(lat,lng,radius,type,months)` · `get_price_at_location(lat,lng,radius,type)` ·
 `get_cell_price_history(cell_id,type,months)` · `get_pin_price_timeline(pin_id)`.
 
-Migration: `supabase/migrations/20261024_price_history_immutable.sql` + `..._backfill.sql`.
-Kiểm chứng: `python scripts/verify_price_history.py` (tạo ghim → đổi giá 2 lần → xoá ghim → lịch sử còn nguyên, PASS/FAIL từng bước).
+Migration: `supabase/migrations/20261024_price_history_immutable.sql` + `..._backfill.sql` +
+`supabase/migrations/20261024_price_history_keep_removed.sql` (giữ căn đã gỡ trong biểu đồ tới hết tháng bị gỡ).
+Kiểm chứng: `python scripts/verify_price_history.py` (tạo ghim → đổi giá 2 lần → xoá ghim → lịch sử còn nguyên, PASS/FAIL từng bước)
+và `scripts/verify_price_retention.sql` (chạy trong transaction tự rollback: xoá ghim → tháng cũ vẫn còn 1 căn, tháng hiện tại 0 căn, ô lưới vẫn giữ).
 
 `pins` (cột chính): `id, user_id → profiles(id), title, description, property_type(nha-pho|can-ho|dat-nen|biet-thu),
 price_vnd, area_m2, price_per_m2 (generated), public_geom/exact_geom geography(Point,4326), address_text,
@@ -122,7 +128,30 @@ Kiểm chứng: `docker exec -i supabase_db_AdIntel.dms psql -U postgres -d post
 (8 ảnh 1 câu lệnh OK, ảnh 9 bị chặn, video 2 bị chặn, video 60s bị chặn — tự rollback)
 + `python scripts/verify_pin_media.py` (bước 9–13 kiểm qua REST API thật) + `node scripts/media_rules.test.mjs` (22 case logic).
 
-## 8. Việc còn mở / nợ kỹ thuật
+## 8. Bắt đúng toà khi thả ghim (2026-10-24)
+
+Khi chủ nhà đặt ghim bằng tâm ngắm, app tự dóng ghim về **tâm toà nhà / số nhà gần nhất** trên dữ liệu OSM.
+
+| Hạng mục | Nội dung |
+|---|---|
+| Code | `src/services/buildingSnap.ts` (`snapToBuilding`, `haversineM`, `pickNearest`, `isBuildingLike`) |
+| Nguồn chính | **Photon** `https://photon.komoot.io/reverse` (nhanh, trả toà nhà + số nhà, không giới hạn slot) |
+| Nguồn dự phòng | **Overpass API** (polygon `building=*`, cần `User-Agent` tên app, chỉ 2 slot/IP → có thể bị 406/chặn; lỗi thì bỏ qua êm) |
+| Bán kính bắt | `SNAP_RADIUS_M = 40` m — ngoài bán kính thì giữ nguyên toạ độ người dùng thả |
+| Lọc | Chỉ nhận `building=*` hoặc `place=house` (số nhà); bỏ quán ăn/cửa hàng/ga tàu nằm gần |
+| Cache | Theo ô ~11m, tối đa 300 mục → thả nhiều ghim quanh một toà chỉ gọi API 1 lần |
+| UI | `CreatePinModal` hiện `🏢 Đang dóng…` → `✅ Đã bắt đúng toà: <tên> · cách điểm thả Nm` + link **Dùng vị trí tay**; không thấy toà thì cảnh báo và dùng đúng toạ độ đã thả |
+| Không có GPS | Tâm ngắm bắt đầu từ tâm bản đồ hiện tại (`mapCenterRef`), không nhảy về toạ độ mặc định |
+
+Kiểm chứng: `node scripts/building_snap.test.mjs` — 12 case, gọi API thật:
+Vincom Center (Landmark 81) lệch 10,8m → dóng về tâm toà 2,4m; Lotte Center Hanoi lệch 7,0m;
+nhà phố `166 Đường Thụy Khuê` lệch 9,8m → bắt đúng số nhà; giữa biển + điểm không có toà trong bán kính → `snapped=false`.
+Đã thử live trên emulator: tìm "Lotte Center" → `+` → Chọn vị trí → xác nhận → hiện `✅ Đã bắt đúng toà: Lotte Center Hanoi · cách điểm thả 0m`.
+
+Kèm sửa lỗi: `src/services/placeSearch.ts` gửi `lang=vi` → Photon trả **HTTP 400** nên thanh tìm kiếm
+luôn ra rỗng; đã bỏ `lang` (Photon chỉ hỗ trợ default/de/en/fr). Kiểm chứng: `node scripts/place_search.test.mjs` (4 case).
+
+## 9. Việc còn mở / nợ kỹ thuật
 
 - `app.json` còn `android.config.googleMaps.apiKey` = placeholder → APK thật cần key.
 - README đã sửa SDK 58, nhưng vẫn chưa mô tả hết `pin_saves`, `pin_media`, `get_my_pins`.
@@ -133,7 +162,7 @@ Kiểm chứng: `docker exec -i supabase_db_AdIntel.dms psql -U postgres -d post
 - Các script verify hardcode `BASE = http://192.168.2.22:54321` + JWT secret → đổi mạng/IP là phải sửa.
 - `App.tsx` 1838 dòng: nên tách màn hình/lọc/thẻ chi tiết khi thêm tính năng lớn.
 
-## 9. Chạy & kiểm chứng
+## 10. Chạy & kiểm chứng
 
 ```bash
 cd C:/Users/PC/projects/bds-price-map-mobile
@@ -150,7 +179,10 @@ python scripts/verify_my_pins.py        # get_my_pins + set_pin_status + chặn 
 python scripts/verify_owner_account.py  # tên chủ ghim + xác thực tài khoản
 python scripts/verify_pin_media.py      # pin_media + get_pin_media_counts
 node scripts/media_rules.test.mjs       # 22 case logic giới hạn media + mask SĐT
+node scripts/building_snap.test.mjs     # 12 case "bắt đúng toà" (Photon/Overpass thật)
+node scripts/place_search.test.mjs      # 4 case tìm địa điểm (Photon API thật)
 docker exec -i supabase_db_AdIntel.dms psql -U postgres -d postgres < scripts/verify_media_limits.sql  # trigger giới hạn media (tự rollback)
+docker exec -i supabase_db_AdIntel.dms psql -U postgres -d postgres < scripts/verify_price_retention.sql  # giữ lịch sử giá sau khi xoá ghim (tự rollback)
 python scripts/verify_saved_pins.py     # toggle_save_pin + get_my_saved_pins
 bash  scripts/enable_google_oauth.sh    # dựng lại container auth với Google provider
 ```
@@ -158,7 +190,7 @@ bash  scripts/enable_google_oauth.sh    # dựng lại container auth với Goog
 DB nhanh: `docker exec supabase_db_AdIntel.dms psql -U postgres -d postgres -c "select count(*) from pins;"`
 (hiện: 17 pins, 4 users, 3 saves, 4 profiles).
 
-## 10. Giao thức làm việc trong thread này
+## 11. Giao thức làm việc trong thread này
 
 1. Đọc file này + `git log --oneline -10` trước khi sửa.
 2. Sửa nhỏ, commit theo feature (message tiếng Việt không dấu như hiện tại).

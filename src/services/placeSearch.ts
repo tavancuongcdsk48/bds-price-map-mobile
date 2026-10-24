@@ -16,10 +16,11 @@ export async function searchPlaces(query: string): Promise<PlaceResult[]> {
   if (q.length < 2) return [];
 
   try {
+    // Photon chỉ hỗ trợ lang=default/de/en/fr → không gửi lang=vi (sẽ bị HTTP 400)
     const url =
       'https://photon.komoot.io/api/?q=' +
       encodeURIComponent(q) +
-      '&limit=8&lang=vi&bbox=' +
+      '&limit=8&bbox=' +
       VN_BBOX;
 
     const res = await fetch(url, { headers: { Accept: 'application/json' } });

@@ -10,10 +10,11 @@ bong bóng giá từng căn, và đăng bán nhà của mình trong 60 giây.
 - Giới hạn media chặn 2 lớp: client (`src/lib/mediaRules.ts`) + trigger DB (`supabase/migration_media_limits.sql`)
 - Bộ lọc theo loại hình (nhà phố / căn hộ), lọc ghim có video thật
 - Thẻ chi tiết: giá, diện tích, đơn giá/m², nút **Gọi** và **Nhắn Zalo** chủ nhà (khách chưa đăng nhập chỉ thấy số đã ẩn 4 số cuối, bấm vào sẽ được mời đăng nhập)
-- Tự đặt ghim chính xác trên bản đồ (không cần đứng tại căn nhà) bằng tâm ngắm
+- Tự đặt ghim chính xác trên bản đồ (không cần đứng tại căn nhà) bằng tâm ngắm; app tự **bắt đúng toà/số nhà** gần nhất trên OSM (bán kính 40m, Photon + Overpass dự phòng) và cho phép bỏ dóng bằng "Dùng vị trí tay"
 - Làm mờ toạ độ công khai 50–100m để bảo vệ dữ liệu cá nhân; toạ độ chính xác chỉ lưu nội bộ
 - Chỉ người đã ghim mới sửa được giá: database kiểm tra `auth.uid()` (RLS + RPC trả `not_pin_owner`), không dùng `device_id`
 - Mỗi lần đổi giá được ghi thành một mốc lịch sử, sẵn sàng cho biểu đồ giá theo tháng/năm
+- Xoá ghim không mất lịch sử: sổ cái `price_observations` giữ giá của vị trí, biểu đồ khu vực/ô lưới vẫn tính căn đã gỡ tới hết tháng bị gỡ
 
 ## Kiến trúc
 

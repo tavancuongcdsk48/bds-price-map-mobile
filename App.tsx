@@ -53,6 +53,7 @@ import {
 } from './src/services/pinService';
 import { searchPlaces, PlaceResult } from './src/services/placeSearch';
 import { maskPhone } from './src/lib/mediaRules';
+import { snapToBuilding } from './src/services/buildingSnap';
 
 type SearchRow = {
   key: string;
@@ -148,6 +149,12 @@ export default function App() {
   // Chế độ đặt ghim thủ công: dùng chính bản đồ chính, không mở bản đồ thứ hai
   const [pickMode, setPickMode] = useState(false);
   const [pickCenter, setPickCenter] = useState<{ latitude: number; longitude: number } | null>(null);
+  // "Bắt đúng toà": kết quả dóng về tâm toà nhà OSM (null = không tìm thấy toà trong bán kính)
+  const [snapInfo, setSnapInfo] = useState<{ name: string | null; distanceM: number; source: string } | null>(null);
+  const [snapBusy, setSnapBusy] = useState(false);
+  const [rawPickCoords, setRawPickCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  // Tâm bản đồ hiện tại — dùng làm điểm bắt đầu khi chọn vị trí mà chưa có GPS
+  const mapCenterRef = React.useRef<{ latitude: number; longitude: number } | null>(null);
 
   // Thanh tìm kiếm: khu vực, dự án, xã/huyện/tỉnh + ghim trong hệ thống
   const [searchQuery, setSearchQuery] = useState('');
@@ -327,7 +334,9 @@ export default function App() {
   const startPickMode = () => {
     const start =
       pickedCoords ??
-      (location ? { latitude: location.latitude, longitude: location.longitude } : { latitude: 21.0335, longitude: 105.7942 });
+      (location
+        ? { latitude: location.latitude, longitude: location.longitude }
+        : mapCenterRef.current ?? { latitude: 21.0335, longitude: 105.7942 });
     setPickCenter(start);
     setCreateModalVisible(false);
     setPickMode(true);
@@ -337,10 +346,40 @@ export default function App() {
     );
   };
 
-  const confirmPickMode = () => {
-    if (pickCenter) setPickedCoords(pickCenter);
+  const confirmPickMode = async () => {
+    if (pickCenter) {
+      const raw = pickCenter;
+      setRawPickCoords(raw);
+      setPickedCoords(raw);
+      setSnapInfo(null);
+      setPickMode(false);
+      setCreateModalVisible(true);
+
+      // Dóng về tâm toà nhà gần nhất (OSM) để ghim nằm đúng toà chứ không lệch ra vỉa hè
+      setSnapBusy(true);
+      try {
+        const snapped = await snapToBuilding(raw.latitude, raw.longitude);
+        if (snapped.snapped) {
+          setPickedCoords({ latitude: snapped.latitude, longitude: snapped.longitude });
+          setSnapInfo({
+            name: snapped.name,
+            distanceM: Math.round(snapped.distanceM),
+            source: snapped.source,
+          });
+        }
+      } finally {
+        setSnapBusy(false);
+      }
+      return;
+    }
     setPickMode(false);
     setCreateModalVisible(true);
+  };
+
+  // Người dùng muốn giữ đúng toạ độ mình thả, không dóng theo toà
+  const useManualPickCoords = () => {
+    if (rawPickCoords) setPickedCoords(rawPickCoords);
+    setSnapInfo(null);
   };
 
   const cancelPickMode = () => {
@@ -831,6 +870,7 @@ export default function App() {
           style={styles.map}
           initialRegion={initialRegion}
           onRegionChangeComplete={(region) => {
+            mapCenterRef.current = { latitude: region.latitude, longitude: region.longitude };
             loadPins(region);
             if (pickMode) {
               setPickCenter({ latitude: region.latitude, longitude: region.longitude });
@@ -1246,6 +1286,9 @@ export default function App() {
         currentCoords={location}
         pickedCoords={pickedCoords}
         onRequestPickLocation={startPickMode}
+        snapInfo={snapInfo}
+        snapBusy={snapBusy}
+        onUseManualCoords={useManualPickCoords}
       />
     </SafeAreaView>
   );

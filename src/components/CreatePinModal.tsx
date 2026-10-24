@@ -24,6 +24,12 @@ interface CreatePinModalProps {
   pickedCoords?: { latitude: number; longitude: number } | null;
   /** Mở màn hình chọn vị trí trên bản đồ */
   onRequestPickLocation: () => void;
+  /** Kết quả "bắt đúng toà" sau khi thả ghim (null = không có toà trong bán kính) */
+  snapInfo?: { name: string | null; distanceM: number; source: string } | null;
+  /** Đang dóng về toà nhà */
+  snapBusy?: boolean;
+  /** Giữ lại đúng toạ độ người dùng thả, bỏ dóng theo toà */
+  onUseManualCoords?: () => void;
 }
 
 export interface NewPinData {
@@ -45,6 +51,9 @@ export const CreatePinModal: React.FC<CreatePinModalProps> = ({
   currentCoords,
   pickedCoords,
   onRequestPickLocation,
+  snapInfo,
+  snapBusy,
+  onUseManualCoords,
 }) => {
   const [title, setTitle] = useState('');
   const [priceBillion, setPriceBillion] = useState('');
@@ -362,6 +371,26 @@ export const CreatePinModal: React.FC<CreatePinModalProps> = ({
               Không đứng tại căn nhà vẫn đặt được: bấm “Chọn” rồi kéo bản đồ cho tâm ngắm vào đúng vị trí.
             </Text>
 
+            {/* Bắt đúng toà: dóng ghim về tâm toà nhà trên dữ liệu OSM */}
+            {snapBusy ? (
+              <Text style={styles.snapBusy}>🏢 Đang dóng về toà nhà gần nhất…</Text>
+            ) : snapInfo && pickedCoords ? (
+              <View style={styles.snapRow}>
+                <Text style={styles.snapText}>
+                  ✅ Đã bắt đúng toà{snapInfo.name ? `: ${snapInfo.name}` : ''} · cách điểm thả {snapInfo.distanceM}m
+                </Text>
+                {onUseManualCoords ? (
+                  <TouchableOpacity onPress={onUseManualCoords} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={styles.snapLink}>Dùng vị trí tay</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ) : pickedCoords ? (
+              <Text style={styles.snapWarn}>
+                ⚠️ Không thấy toà nhà nào trong 40m quanh điểm bạn thả — ghim dùng đúng toạ độ đã chọn.
+              </Text>
+            ) : null}
+
             {/* Chọn Ảnh & Video */}
             <Text style={styles.label}>
               Ảnh thực tế căn nhà (Tối đa {MEDIA_LIMITS.maxImages} ảnh, tự nén WebP ≤ {formatBytes(MEDIA_LIMITS.maxImageBytes)})
@@ -500,6 +529,22 @@ const styles = StyleSheet.create({
   },
   locationAction: { color: '#22c55e', fontSize: 13, fontWeight: '700' },
   locationHint: { color: '#64748b', fontSize: 11, marginTop: 6, lineHeight: 16 },
+  snapBusy: { color: '#fbbf24', fontSize: 12, marginTop: 8 },
+  snapRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.35)',
+  },
+  snapText: { color: '#6ee7b7', fontSize: 12, flex: 1, lineHeight: 17 },
+  snapLink: { color: '#38bdf8', fontSize: 12, fontWeight: '600', marginLeft: 10 },
+  snapWarn: { color: '#fbbf24', fontSize: 12, marginTop: 8, lineHeight: 17 },
   calcBox: {
     flexDirection: 'row',
     alignItems: 'center',
