@@ -978,6 +978,7 @@ export default function App() {
           onRegionChangeComplete={(region) => {
             mapCenterRef.current = { latitude: region.latitude, longitude: region.longitude };
             setMapDelta(region.latitudeDelta);
+
             loadPins(region);
             if (pickMode) {
               setPickCenter({ latitude: region.latitude, longitude: region.longitude });
@@ -1024,38 +1025,54 @@ export default function App() {
               </View>
             </Marker>
           ))}
-          {/* Lô biệt thự điểm nhấn: NT06-10 (Đường Ngọc Trai 6) */}
+          {/* Lô biệt thự điểm nhấn: NT06-10 (Khung chữ nhật viền trắng, chữ nằm gọn bên trong) */}
           {oceanParkLayout.highlight_plot && (
             <>
+              {/* Viền hình chữ nhật màu trắng bo đúng ranh giới lô đất */}
               <Polygon
                 coordinates={oceanParkLayout.highlight_plot.coordinates}
-                strokeColor="#ef4444"
-                fillColor="rgba(239, 68, 68, 0.35)"
-                strokeWidth={2.5}
+                strokeColor="#ffffff"
+                fillColor="rgba(255, 255, 255, 0.08)"
+                strokeWidth={2}
               />
+              {/* Text nằm gọn bên trong lô đất theo đúng hướng nhà */}
               <Marker
                 coordinate={oceanParkLayout.highlight_plot.center}
+                anchor={{ x: 0.5, y: 0.5 }}
                 tracksViewChanges={false}
               >
-                <View style={{
-                  backgroundColor: '#ef4444',
-                  paddingHorizontal: 7,
-                  paddingVertical: 3,
-                  borderRadius: 6,
-                  borderWidth: 1.5,
-                  borderColor: '#ffffff',
-                  alignItems: 'center',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.35,
-                  shadowRadius: 3,
-                  elevation: 5,
-                }}>
-                  <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '800' }}>
-                    NT06-10
+                <View
+                  style={{
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transform: [{ rotate: `${oceanParkLayout.highlight_plot.rotation || 0}deg` }],
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#ffffff',
+                      fontSize: 10,
+                      fontWeight: '800',
+                      letterSpacing: 0.5,
+                      textShadowColor: 'rgba(0, 0, 0, 0.95)',
+                      textShadowOffset: { width: 0, height: 1 },
+                      textShadowRadius: 2,
+                    }}
+                  >
+                    {oceanParkLayout.highlight_plot.code}
                   </Text>
-                  <Text style={{ color: '#fee2e2', fontSize: 8.5, fontWeight: '600' }}>
-                    153m²
+                  <Text
+                    style={{
+                      color: '#e2e8f0',
+                      fontSize: 8,
+                      fontWeight: '700',
+                      marginTop: 1,
+                      textShadowColor: 'rgba(0, 0, 0, 0.95)',
+                      textShadowOffset: { width: 0, height: 1 },
+                      textShadowRadius: 2,
+                    }}
+                  >
+                    {oceanParkLayout.highlight_plot.area_m2}m²
                   </Text>
                 </View>
               </Marker>

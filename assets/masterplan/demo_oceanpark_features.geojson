@@ -1,0 +1,175 @@
+{
+  "type": "FeatureCollection",
+  "project": "Vinhomes Ocean Park 1",
+  "subdivision": "Ngọc Trai - Phân khu Đảo",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "NT01-20",
+        "type": "biet-thu-don-lap",
+        "type_label": "Biệt thự đơn lập ven hồ",
+        "area_m2": 339.0,
+        "street": "Đường Ngọc Trai 01",
+        "orientation": "Đông Nam - Ven hồ lớn"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              105.9458,
+              20.9902
+            ],
+            [
+              105.94595,
+              20.99025
+            ],
+            [
+              105.9459,
+              20.9901
+            ],
+            [
+              105.94575,
+              20.99005
+            ],
+            [
+              105.9458,
+              20.9902
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "NT02-35",
+        "type": "biet-thu-song-lap",
+        "type_label": "Biệt thự song lập",
+        "area_m2": 183.6,
+        "street": "Đường Ngọc Trai 01",
+        "orientation": "Tây Bắc"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              105.9456,
+              20.9903
+            ],
+            [
+              105.94572,
+              20.99034
+            ],
+            [
+              105.94568,
+              20.99022
+            ],
+            [
+              105.94556,
+              20.99018
+            ],
+            [
+              105.9456,
+              20.9903
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "NT02-48",
+        "type": "nha-lien-ke",
+        "type_label": "Nhà liền kề",
+        "area_m2": 153.0,
+        "street": "Đường Ngọc Trai 02",
+        "orientation": "Tây Nam"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              105.9454,
+              20.99045
+            ],
+            [
+              105.9455,
+              20.99048
+            ],
+            [
+              105.94547,
+              20.99038
+            ],
+            [
+              105.94537,
+              20.99035
+            ],
+            [
+              105.9454,
+              20.99045
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "S2.05",
+        "type": "chung-cu-cao-tang",
+        "type_label": "Tòa chung cư cao tầng (Chữ Z)",
+        "floors": 26,
+        "cluster": "The Sapphire 2",
+        "units_per_floor": 19
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              105.9385,
+              20.9928
+            ],
+            [
+              105.9389,
+              20.9928
+            ],
+            [
+              105.9389,
+              20.9925
+            ],
+            [
+              105.9387,
+              20.9925
+            ],
+            [
+              105.9387,
+              20.9922
+            ],
+            [
+              105.9383,
+              20.9922
+            ],
+            [
+              105.9383,
+              20.9925
+            ],
+            [
+              105.9385,
+              20.9925
+            ],
+            [
+              105.9385,
+              20.9928
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}
