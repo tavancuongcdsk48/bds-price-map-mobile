@@ -141,7 +141,7 @@ Khi chủ nhà đặt ghim bằng tâm ngắm, app tự dóng ghim về **tâm t
 | Lọc | Chỉ nhận `building=*` hoặc `place=house` (số nhà); bỏ quán ăn/cửa hàng/ga tàu nằm gần |
 | Cache | Theo ô ~11m, tối đa 300 mục → thả nhiều ghim quanh một toà chỉ gọi API 1 lần |
 | UI | `CreatePinModal` hiện `🏢 Đang dóng…` → `✅ Đã bắt đúng toà: <tên> · cách điểm thả Nm` + link **Dùng vị trí tay**; không thấy toà thì cảnh báo và dùng đúng toạ độ đã thả |
-| Không có GPS | Tâm ngắm bắt đầu từ tâm bản đồ hiện tại (`mapCenterRef`), không nhảy về toạ độ mặc định |
+| Không có GPS | Chờ fix mới tối đa 8s → fallback `getLastKnownPositionAsync` (≤30 phút); vẫn không có thì tâm ngắm bắt đầu từ tâm bản đồ hiện tại (`mapCenterRef`), không nhảy về toạ độ mặc định |
 
 Kiểm chứng: `node scripts/building_snap.test.mjs` — 12 case, gọi API thật:
 Vincom Center (Landmark 81) lệch 10,8m → dóng về tâm toà 2,4m; Lotte Center Hanoi lệch 7,0m;

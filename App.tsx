@@ -193,8 +193,21 @@ export default function App() {
           setLoading(false);
           return;
         }
-        const currentLoc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        setLocation(currentLoc.coords);
+
+        // getCurrentPositionAsync có thể treo/không có fix mới (trong nhà, emulator) →
+        // chờ tối đa 8s rồi lấy vị trí biết gần nhất thay vì bỏ trắng GPS
+        const fresh = await Promise.race([
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).catch(() => null),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
+        ]);
+        const pos =
+          fresh ?? (await Location.getLastKnownPositionAsync({ maxAge: 30 * 60 * 1000 }).catch(() => null));
+
+        if (pos) {
+          setLocation(pos.coords);
+        } else {
+          console.warn('GPS: chưa có fix và không có vị trí cũ — dùng tâm bản đồ mặc định');
+        }
       } catch (err) {
         console.warn('Lỗi GPS:', err);
       } finally {
