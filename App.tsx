@@ -748,11 +748,11 @@ export default function App() {
           <View style={styles.sheetHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.sheetTitle} numberOfLines={2}>{selectedPin.title}</Text>
-              <View style={[styles.ownerBadge, selectedPin.is_mine ? styles.ownerBadgeMine : styles.ownerBadgeOther]}>
-                <Text style={styles.ownerBadgeText}>
-                  {selectedPin.is_mine ? '👤 Ghim của bạn — bạn có quyền sửa/xoá' : '🔒 Ghim của tài khoản khác — chỉ xem'}
-                </Text>
-              </View>
+              {selectedPin.is_mine ? (
+                <View style={[styles.ownerBadge, styles.ownerBadgeMine]}>
+                  <Text style={styles.ownerBadgeText}>👤 Ghim của bạn</Text>
+                </View>
+              ) : null}
               {selectedPin.is_verified ? (
                 <View style={styles.badgeVerified}>
                   <Text style={styles.badgeText}>✓ Chính chủ xác thực</Text>
@@ -782,31 +782,40 @@ export default function App() {
 
           <Text style={styles.addressText}>📍 {selectedPin.address_text}</Text>
 
-          {/* Lịch sử giá — nền dữ liệu cho biểu đồ giá theo tháng/năm */}
-          {priceHistory.length > 0 && (
+          {/* Lịch sử giá — chỉ hiện khi đã có ít nhất 2 mốc (tức có đổi giá thật) */}
+          {priceHistory.length >= 2 && (
             <View style={styles.historyBox}>
               <View style={styles.historyHead}>
                 <Text style={styles.historyTitle}>Lịch sử giá</Text>
-                <Text style={styles.historyCount}>{priceHistory.length} lần cập nhật</Text>
+                <Text style={styles.historyCount}>{priceHistory.length} mốc giá</Text>
               </View>
 
               <View style={styles.chartRow}>
-                {priceHistory.slice(-8).map((h, idx, arr) => {
+                {priceHistory.slice(-5).map((h, idx, arr) => {
                   const max = Math.max(...arr.map((x) => x.price_vnd));
                   const min = Math.min(...arr.map((x) => x.price_vnd));
                   const ratio = max === min ? 0.6 : 0.3 + ((h.price_vnd - min) / (max - min)) * 0.7;
                   const isLast = idx === arr.length - 1;
+                  const d = new Date(h.created_at);
+                  const price = (h.price_vnd / 1000000000).toFixed(1).replace('.', ',') + ' tỷ';
                   return (
                     <View key={`${h.created_at}-${idx}`} style={styles.chartCol}>
-                      <Text style={styles.chartValue}>{(h.price_vnd / 1000000000).toFixed(1)}</Text>
+                      <Text
+                        style={[styles.chartValue, isLast && styles.chartValueLast]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.7}
+                      >
+                        {price}
+                      </Text>
                       <View
                         style={[
                           styles.chartBar,
-                          { height: Math.round(46 * ratio), backgroundColor: isLast ? '#22c55e' : '#334155' },
+                          { height: Math.round(40 * ratio), backgroundColor: isLast ? '#22c55e' : '#334155' },
                         ]}
                       />
-                      <Text style={styles.chartLabel}>
-                        {new Date(h.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                      <Text style={styles.chartLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                        {`${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`}
                       </Text>
                     </View>
                   );
@@ -835,11 +844,7 @@ export default function App() {
                 <Text style={styles.deletePinText}>🗑 Xoá ghim</Text>
               </TouchableOpacity>
             </View>
-          ) : (
-            <Text style={styles.notOwnerNote}>
-              🔒 Ghim của tài khoản khác — chỉ chủ ghim mới sửa hoặc xoá được
-            </Text>
-          )}
+          ) : null}
 
           {selectedPin.has_video && (
             <TouchableOpacity
@@ -1017,10 +1022,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 10,
   },
-  chartCol: { alignItems: 'center', flex: 1 },
-  chartValue: { color: '#94a3b8', fontSize: 9, marginBottom: 4 },
-  chartBar: { width: '62%', borderRadius: 4, minHeight: 6 },
-  chartLabel: { color: '#64748b', fontSize: 9, marginTop: 4 },
+  chartCol: { alignItems: 'center', flex: 1, paddingHorizontal: 1 },
+  chartValue: { color: '#94a3b8', fontSize: 10, fontWeight: '700', marginBottom: 4 },
+  chartValueLast: { color: '#4ade80' },
+  chartBar: { width: '70%', borderRadius: 4, minHeight: 6 },
+  chartLabel: { color: '#64748b', fontSize: 8, marginTop: 4, textAlign: 'center' },
 
   editPriceBtn: {
     marginTop: 12,
