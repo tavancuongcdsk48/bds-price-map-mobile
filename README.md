@@ -18,7 +18,7 @@ bong bóng giá từng căn, và đăng bán nhà của mình trong 60 giây.
 
 | Thành phần | Công nghệ |
 |---|---|
-| App | Expo SDK 54 + React Native + TypeScript |
+| App | Expo SDK 58 + React Native + TypeScript |
 | Bản đồ | `react-native-maps` — Apple Maps trên iOS, Google Maps trên Android |
 | Backend | Supabase (Postgres + PostGIS + RLS) |
 | Truy vấn ghim | RPC `get_pins_in_bounds` dùng `ST_MakeEnvelope` / `ST_Contains` |

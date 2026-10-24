@@ -1,3 +1,5 @@
+> **Đọc `docs/PROJECT_CONTEXT.md` trước khi làm bất cứ gì** — đó là nguồn sự thật về hạ tầng, quy ước quyền, việc đã xong và việc còn mở của dự án này.
+
 This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
 
 ## Expo has changed — do not trust your training data
