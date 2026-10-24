@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
 import * as Linking from 'expo-linking';
 import { supabase } from '../lib/supabase';
 import { Session, User } from '@supabase/supabase-js';
@@ -8,13 +7,49 @@ import { Session, User } from '@supabase/supabase-js';
 // Cần gọi để đóng trình duyệt auth sau khi nhận callback
 WebBrowser.maybeCompleteAuthSession();
 
-const SCHEME = 'vutruchuyennhuong';
+// Trích access_token / refresh_token từ URL callback (dạng #... hoặc ?...)
+function tokensFromUrl(url: string) {
+  const hashPart = url.includes('#') ? url.split('#')[1] : '';
+  const queryPart = url.includes('?') ? url.split('?')[1] : '';
+  const params = new URLSearchParams(hashPart || queryPart);
+  return {
+    accessToken: params.get('access_token'),
+    refreshToken: params.get('refresh_token'),
+    errorDescription: params.get('error_description') || params.get('error'),
+  };
+}
 
 export function useGoogleAuth() {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const waiter = useRef<((ok: boolean) => void) | null>(null);
+
+  // Nhận token từ deep link: Chrome mở trang Google rồi quay lại app bằng exp://.../auth/callback
+  useEffect(() => {
+    const handle = async (url: string | null) => {
+      if (!url || !url.includes('auth/callback')) return;
+      const { accessToken, refreshToken, errorDescription } = tokensFromUrl(url);
+      if (errorDescription) {
+        setAuthError(errorDescription);
+        waiter.current?.(false);
+        return;
+      }
+      if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (error) setAuthError(error.message);
+        waiter.current?.(!error);
+      }
+    };
+    // App có thể bị Expo Go khởi động lại bằng chính deep link đó
+    Linking.getInitialURL().then(handle);
+    const sub = Linking.addEventListener('url', (e) => handle(e.url));
+    return () => sub.remove();
+  }, []);
 
   // Lấy session hiện tại khi mở app
   useEffect(() => {
@@ -53,37 +88,20 @@ export function useGoogleAuth() {
       if (error) throw error;
       if (!data?.url) throw new Error('Không nhận được URL xác thực từ Google.');
 
-      // Mở trình duyệt Custom Tab / Safari View Controller
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+      // Mở trình duyệt thật (Custom Tab). KHÔNG dùng openAuthSessionAsync: URL authorize
+      // của Supabase đã chứa redirect_to nên tab bị coi là "đã redirect" và đóng ngay lập tức.
+      // Token quay về qua deep link, xử lý trong effect ở trên.
+      const done = new Promise<boolean>((resolve) => {
+        waiter.current = resolve;
+        setTimeout(() => resolve(false), 5 * 60 * 1000);
+      });
 
-      if (result.type === 'success' && result.url) {
-        // Trích xuất mã xác thực từ redirect URL
-        const hashPart = result.url.includes('#') ? result.url.split('#')[1] : '';
-        const queryPart = result.url.includes('?') ? result.url.split('?')[1] : '';
-        const params = new URLSearchParams(hashPart || queryPart);
-
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
-        const errorDescription = params.get('error_description');
-
-        if (errorDescription) throw new Error(errorDescription);
-
-        if (accessToken && refreshToken) {
-          const { error: setSessionError } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-          if (setSessionError) throw setSessionError;
-          return true;
-        }
-        throw new Error('Không nhận được token đăng nhập từ Google.');
-      }
-
-      if (result.type === 'cancel' || result.type === 'dismiss') {
-        setAuthError('Bạn đã huỷ đăng nhập Google.');
-        return false;
-      }
-      return false;
+      // Mở bằng intent thường (tab Chrome đầy đủ). Custom Tab của expo-web-browser
+      // bị đóng ngay trên một số máy/emulator nên không dùng.
+      await Linking.openURL(data.url);
+      const ok = await done;
+      if (!ok) setAuthError((prev) => prev || 'Chưa hoàn tất đăng nhập Google. Thử lại giúp mình nhé.');
+      return ok;
     } catch (err: any) {
       const msg = String(err?.message || err || '');
       const lower = msg.toLowerCase();

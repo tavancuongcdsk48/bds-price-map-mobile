@@ -1,4 +1,4 @@
-import * as ImageManipulator from 'expo-image-manipulator';
+import type { Action } from 'expo-image-manipulator';
 import { MEDIA_LIMITS, MediaAsset } from './mediaRules';
 
 export type CompressedImage = {
@@ -7,6 +7,22 @@ export type CompressedImage = {
   height: number;
   bytes: number;
 };
+
+// Nạp module native theo kiểu "mềm": nếu bản Expo Go / build đang chạy không có
+// expo-image-manipulator thì app vẫn mở được, chỉ là ảnh không được nén.
+type ManipulatorModule = typeof import('expo-image-manipulator');
+let manipulador: ManipulatorModule | null | undefined;
+
+function getManipulator(): ManipulatorModule | null {
+  if (manipulador !== undefined) return manipulador;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    manipulador = require('expo-image-manipulator') as ManipulatorModule;
+  } catch {
+    manipulador = null;
+  }
+  return manipulador;
+}
 
 const QUALITY_STEPS = [0.8, 0.6, 0.45, 0.3];
 
@@ -20,7 +36,7 @@ async function bytesOf(uri: string): Promise<number> {
   }
 }
 
-function targetResize(asset: MediaAsset): ImageManipulator.Action | null {
+function targetResize(asset: MediaAsset): Action | null {
   const w = asset.width || 0;
   const h = asset.height || 0;
   if (!w || !h) return null;
@@ -38,7 +54,17 @@ function targetResize(asset: MediaAsset): ImageManipulator.Action | null {
  * Luôn trả về ảnh (thu nhỏ + hạ quality dần); nếu mọi bước đều lỗi thì trả file gốc.
  */
 export async function compressImageToLimit(asset: MediaAsset): Promise<CompressedImage> {
-  let actions: ImageManipulator.Action[] = [];
+  const fallback: CompressedImage = {
+    uri: asset.uri,
+    width: asset.width || 0,
+    height: asset.height || 0,
+    bytes: asset.fileSize || 0,
+  };
+
+  const ImageManipulator = getManipulator();
+  if (!ImageManipulator) return fallback;
+
+  let actions: Action[] = [];
   const resize = targetResize(asset);
   if (resize) actions = [resize];
 
@@ -65,12 +91,5 @@ export async function compressImageToLimit(asset: MediaAsset): Promise<Compresse
     actions = [{ resize: { width: Math.max(640, Math.round(baseWidth * 0.75)) } }];
   }
 
-  return (
-    best || {
-      uri: asset.uri,
-      width: asset.width || 0,
-      height: asset.height || 0,
-      bytes: asset.fileSize || 0,
-    }
-  );
+  return best || fallback;
 }
