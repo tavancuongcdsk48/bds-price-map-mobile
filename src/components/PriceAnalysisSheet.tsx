@@ -224,7 +224,7 @@ export const PriceAnalysisSheet: React.FC<PriceAnalysisSheetProps> = ({
                   activeColor="#38bdf8"
                   format={(v) => `${Math.round(v / 1_000_000)}tr`}
                 />
-                {latestArea && latestArea.p25 > 0 && latestArea.p75 > 0 ? (
+                {latestArea && latestArea.p25 > 0 && latestArea.p75 > latestArea.p25 ? (
                   <Text style={styles.note}>
                     Tháng gần nhất: phổ biến từ {formatPpm2(latestArea.p25)} đến {formatPpm2(latestArea.p75)} (P25–P75).
                     Căn đã bán/xoá vẫn được tính tới hết tháng bị gỡ nên biểu đồ không bị “rơi” giả tạo.
