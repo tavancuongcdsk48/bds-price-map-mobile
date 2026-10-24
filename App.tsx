@@ -193,17 +193,8 @@ export default function App() {
     loadPins();
   }, [activeFilter, location, user?.id]);
 
-  // Sau khi đăng nhập Google: nhận các ghim demo cũ về tài khoản này rồi tải lại
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    (async () => {
-      const claimed = await claimDemoPins();
-      if (claimed > 0) {
-        console.log(`Đã chuyển ${claimed} ghim demo về tài khoản ${user?.email || user?.id}`);
-      }
-      await loadPins();
-    })();
-  }, [isAuthenticated, user?.id]);
+  // KHÔNG tự nhận ghim demo khi đăng nhập: ghim phải thuộc đúng tài khoản đã tạo ra nó.
+  // (Hàm claimDemoPins vẫn để trong service, chỉ dùng khi chạy script chuyển dữ liệu có chủ đích.)
 
   // Mỗi khi mở một ghim khác, nạp lịch sử giá của ghim đó
   useEffect(() => {
@@ -757,6 +748,11 @@ export default function App() {
           <View style={styles.sheetHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.sheetTitle} numberOfLines={2}>{selectedPin.title}</Text>
+              <View style={[styles.ownerBadge, selectedPin.is_mine ? styles.ownerBadgeMine : styles.ownerBadgeOther]}>
+                <Text style={styles.ownerBadgeText}>
+                  {selectedPin.is_mine ? '👤 Ghim của bạn — bạn có quyền sửa/xoá' : '🔒 Ghim của tài khoản khác — chỉ xem'}
+                </Text>
+              </View>
               {selectedPin.is_verified ? (
                 <View style={styles.badgeVerified}>
                   <Text style={styles.badgeText}>✓ Chính chủ xác thực</Text>
@@ -1223,6 +1219,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  ownerBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  ownerBadgeMine: { backgroundColor: 'rgba(34,197,94,0.14)', borderColor: '#22c55e' },
+  ownerBadgeOther: { backgroundColor: 'rgba(148,163,184,0.14)', borderColor: 'rgba(148,163,184,0.4)' },
+  ownerBadgeText: { color: '#e2e8f0', fontSize: 10, fontWeight: '700' },
+
   savedHeaderBtn: {
     width: 44,
     height: 44,
