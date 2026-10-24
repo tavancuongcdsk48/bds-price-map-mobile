@@ -39,7 +39,17 @@
       ],
       "expo-secure-store",
       "expo-web-browser",
-      "expo-video"
+      "expo-video",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": false,
+            "enableShrinkResourcesInReleaseBuilds": false,
+            "extraProguardRules": "# react-native-maps keo androidx.work:work-runtime:2.9.1; R8 xoa constructor cua WorkDatabase_Impl lam app crash luc khoi dong (androidx.startup)\n-keep class androidx.work.** { *; }\n-keep class androidx.room.** { *; }\n-keep class androidx.startup.** { *; }\n-keep class * implements androidx.startup.Initializer { *; }\n-dontwarn androidx.work.**"
+          }
+        }
+      ]
     ]
   }
 }
