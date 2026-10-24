@@ -121,7 +121,7 @@ export async function createPinInSupabase(
   lat: number,
   lng: number,
   userId: string
-): Promise<boolean> {
+): Promise<string | null> {
   try {
     // Làm mờ toạ độ công khai 50-80m để bảo vệ quyền riêng tư
     const jitterLat = (Math.random() - 0.5) * 0.001;
@@ -149,23 +149,13 @@ export async function createPinInSupabase(
 
     if (error) {
       console.warn('Lỗi insert pin:', error.message);
-      return false;
+      return null;
     }
 
-    // Nếu có video, thêm vào bảng pin_media
-    if (data.video_uri && newPin?.id) {
-      await supabase.from('pin_media').insert({
-        pin_id: newPin.id,
-        media_type: 'video',
-        url: data.video_uri,
-        duration_seconds: 45,
-      });
-    }
-
-    return true;
+    return newPin?.id ?? null;
   } catch (err) {
     console.warn('Lỗi tạo pin:', err);
-    return false;
+    return null;
   }
 }
 
@@ -329,4 +319,106 @@ export async function setSaveNote(pinId: string, note: string): Promise<boolean>
     console.warn('Lỗi ghi chú:', err);
     return false;
   }
+}
+
+// 9. Ảnh/video của một ghim
+export interface PinMediaItem {
+  id: string;
+  media_type: 'image' | 'video';
+  url: string;
+  thumbnail_url: string | null;
+  duration_seconds: number;
+}
+
+export async function fetchPinMedia(pinId: string): Promise<PinMediaItem[]> {
+  try {
+    const { data, error } = await supabase.rpc('get_pin_media', { p_pin_id: pinId });
+    if (error) {
+      console.warn('Lỗi lấy media:', error.message);
+      return [];
+    }
+    return ((data as any[]) || []).map((r) => ({
+      id: r.id,
+      media_type: r.media_type,
+      url: r.url,
+      thumbnail_url: r.thumbnail_url,
+      duration_seconds: Number(r.duration_seconds || 0),
+    }));
+  } catch (err) {
+    console.warn('Lỗi media:', err);
+    return [];
+  }
+}
+
+// 10. Tải ảnh/video từ máy lên bucket pin-media rồi gắn vào ghim
+async function uploadOne(pinId: string, uri: string, kind: 'image' | 'video'): Promise<string | null> {
+  try {
+    const guessed = (uri.split('?')[0].split('.').pop() || '').toLowerCase();
+    const ext = guessed && guessed.length <= 5 ? guessed : kind === 'video' ? 'mp4' : 'jpg';
+    const path = `${pinId}/${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+    const res = await fetch(uri);
+    const buf = await res.arrayBuffer();
+
+    const mime =
+      kind === 'video'
+        ? ext === 'mov'
+          ? 'video/quicktime'
+          : 'video/mp4'
+        : ext === 'png'
+        ? 'image/png'
+        : ext === 'webp'
+        ? 'image/webp'
+        : 'image/jpeg';
+
+    const { error } = await supabase.storage.from('pin-media').upload(path, buf, {
+      contentType: mime,
+      upsert: true,
+    });
+    if (error) {
+      console.warn('Lỗi upload media:', error.message);
+      return null;
+    }
+
+    const { data } = supabase.storage.from('pin-media').getPublicUrl(path);
+    return data?.publicUrl || null;
+  } catch (err) {
+    console.warn('Lỗi upload media:', err);
+    return null;
+  }
+}
+
+/** Tải toàn bộ ảnh (tối đa 8) + 1 video của ghim mới lên storage. Trả về số file thành công. */
+export async function uploadPinMedia(
+  pinId: string,
+  images: string[],
+  videoUri?: string
+): Promise<number> {
+  let ok = 0;
+  const rows: { pin_id: string; media_type: string; url: string; duration_seconds: number }[] = [];
+
+  for (const uri of images.slice(0, 8)) {
+    const url = await uploadOne(pinId, uri, 'image');
+    if (url) {
+      rows.push({ pin_id: pinId, media_type: 'image', url, duration_seconds: 0 });
+      ok += 1;
+    }
+  }
+
+  if (videoUri) {
+    const url = await uploadOne(pinId, videoUri, 'video');
+    if (url) {
+      rows.push({ pin_id: pinId, media_type: 'video', url, duration_seconds: 45 });
+      ok += 1;
+    }
+  }
+
+  if (rows.length > 0) {
+    const { error } = await supabase.from('pin_media').insert(rows);
+    if (error) {
+      console.warn('Lỗi lưu media:', error.message);
+      return 0;
+    }
+  }
+  return ok;
 }

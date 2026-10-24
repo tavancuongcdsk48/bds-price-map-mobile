@@ -26,6 +26,7 @@ import { useGoogleAuth } from './src/hooks/useGoogleAuth';
 import { CreatePinModal, NewPinData } from './src/components/CreatePinModal';
 import { AuthModal } from './src/components/AuthModal';
 import { SavedPinsModal } from './src/components/SavedPinsModal';
+import { MediaStrip, MediaViewer } from './src/components/PinMedia';
 import {
   fetchPinsInBounds,
   searchPinsByText,
@@ -36,6 +37,9 @@ import {
   deletePin,
   toggleSavePin,
   fetchSavedPins,
+  fetchPinMedia,
+  uploadPinMedia,
+  PinMediaItem,
   SavedPin,
   PinItem,
   PriceHistoryPoint
@@ -150,6 +154,9 @@ export default function App() {
   const [savedVisible, setSavedVisible] = useState(false);
   const [savedItems, setSavedItems] = useState<SavedPin[]>([]);
   const [savedLoading, setSavedLoading] = useState(false);
+  const [pinMedia, setPinMedia] = useState<PinMediaItem[]>([]);
+  const [mediaViewerOpen, setMediaViewerOpen] = useState(false);
+  const [mediaStartIndex, setMediaStartIndex] = useState(0);
   const [priceInput, setPriceInput] = useState('');
   const [pinsList, setPinsList] = useState<PinItem[]>(SEED_PINS);
 
@@ -203,9 +210,11 @@ export default function App() {
   // KHÔNG tự nhận ghim demo khi đăng nhập: ghim phải thuộc đúng tài khoản đã tạo ra nó.
   // (Hàm claimDemoPins vẫn để trong service, chỉ dùng khi chạy script chuyển dữ liệu có chủ đích.)
 
-  // Mỗi khi mở một ghim khác, nạp lịch sử giá của ghim đó
+  // Mỗi khi mở một ghim khác, nạp ảnh/video + lịch sử giá của ghim đó
   useEffect(() => {
     if (selectedPin?.id) {
+      setPinMedia([]);
+      fetchPinMedia(selectedPin.id).then(setPinMedia);
       loadPriceHistory(selectedPin.id);
     } else {
       setPriceHistory([]);
@@ -236,6 +245,11 @@ export default function App() {
 
     // Lưu vào Supabase PostGIS
     const saved = await createPinInSupabase(data, baseLat, baseLng, user.id);
+
+    // Tải ảnh/video lên storage rồi gắn vào ghim vừa tạo
+    if (saved && (data.images?.length || data.video_uri)) {
+      await uploadPinMedia(saved, data.images || [], data.video_uri);
+    }
 
     // Refresh lại ghim trên bản đồ
     await loadPins();
@@ -679,10 +693,18 @@ export default function App() {
               <View style={[
                 styles.pinContainer,
                 pin.has_video && styles.pinWithVideo,
+                pin.is_mine && styles.pinMine,
                 selectedPin?.id === pin.id && styles.pinSelected
               ]}>
+                {pin.is_mine && (
+                  <View style={styles.mineMarkerDot}>
+                    <Text style={styles.mineMarkerDotText}>👤</Text>
+                  </View>
+                )}
                 {pin.has_video && <View style={styles.videoDot} />}
-                <Text style={styles.pinPriceText}>{pin.price_display}</Text>
+                <Text style={[styles.pinPriceText, pin.is_mine && styles.pinPriceTextMine]}>
+                  {pin.price_display}
+                </Text>
               </View>
             </Marker>
           ))}
@@ -752,17 +774,21 @@ export default function App() {
       {/* Bottom Sheet Xem Chi Tiết Ghim */}
       {selectedPin && !pickMode && (
         <View style={styles.bottomSheet}>
+          <View style={styles.sheetGrabber} />
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetScrollContent}>
           <View style={styles.sheetHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.sheetTitle} numberOfLines={2}>{selectedPin.title}</Text>
-              {selectedPin.is_mine ? (
-                <View style={[styles.ownerBadge, styles.ownerBadgeMine]}>
-                  <Text style={styles.ownerBadgeText}>👤 Ghim của bạn</Text>
+            <View style={styles.sheetTitleRow}>
+              <Text style={styles.sheetTitle} numberOfLines={2}>
+                {selectedPin.title}
+              </Text>
+              {selectedPin.is_verified ? (
+                <View style={styles.verifiedCheck}>
+                  <Text style={styles.verifiedCheckText}>✓</Text>
                 </View>
               ) : null}
-              {selectedPin.is_verified ? (
-                <View style={styles.badgeVerified}>
-                  <Text style={styles.badgeText}>✓ Chính chủ xác thực</Text>
+              {selectedPin.is_mine ? (
+                <View style={styles.mineDot}>
+                  <Text style={styles.mineDotText}>👤</Text>
                 </View>
               ) : null}
             </View>
@@ -771,23 +797,42 @@ export default function App() {
             </TouchableOpacity>
           </View>
 
-          {/* Hộp Giá & Đơn Giá / m2 */}
-          <View style={styles.priceRow}>
-            <View style={styles.priceBox}>
-              <Text style={styles.priceLabel}>GIÁ CHỦ NHÀ RAO</Text>
-              <Text style={styles.priceValue}>{selectedPin.price_display}</Text>
-            </View>
-            <View style={styles.priceBox}>
-              <Text style={styles.priceLabel}>ĐƠN GIÁ / M²</Text>
-              <Text style={styles.unitPriceValue}>{selectedPin.price_per_m2_display}</Text>
-            </View>
-            <View style={styles.priceBox}>
-              <Text style={styles.priceLabel}>DIỆN TÍCH</Text>
-              <Text style={styles.areaValue}>{selectedPin.area_m2} m²</Text>
+          {/* Giá làm điểm nhấn, đơn giá và diện tích gom thành nhãn gọn */}
+          <View style={styles.priceBlock}>
+            <Text style={styles.priceHero}>{selectedPin.price_display}</Text>
+            <View style={styles.pillRow}>
+              <View style={styles.pill}>
+                <Text style={styles.pillText}>{selectedPin.price_per_m2_display}</Text>
+              </View>
+              <View style={styles.pill}>
+                <Text style={styles.pillText}>{selectedPin.area_m2} m²</Text>
+              </View>
+              <View style={styles.pill}>
+                <Text style={styles.pillText}>
+                  {selectedPin.property_type === 'can-ho'
+                    ? 'Căn hộ'
+                    : selectedPin.property_type === 'nha-pho'
+                    ? 'Nhà phố'
+                    : 'Đất nền'}
+                </Text>
+              </View>
             </View>
           </View>
 
           <Text style={styles.addressText}>📍 {selectedPin.address_text}</Text>
+
+          {/* Ảnh / video thực tế: thumbnail, bấm để xem full */}
+          {pinMedia.length > 0 && (
+            <View style={styles.mediaWrap}>
+              <MediaStrip
+                items={pinMedia}
+                onOpen={(i) => {
+                  setMediaStartIndex(i);
+                  setMediaViewerOpen(true);
+                }}
+              />
+            </View>
+          )}
 
           {/* Lịch sử giá — chỉ hiện khi đã có ít nhất 2 mốc (tức có đổi giá thật) */}
           {priceHistory.length >= 2 && (
@@ -841,45 +886,44 @@ export default function App() {
             </Text>
           </TouchableOpacity>
 
-          {/* Chủ ghim được sửa giá */}
+          {/* Hai nút quản lý ghim — chỉ hiện với chủ ghim */}
           {selectedPin.is_mine ? (
-            <View style={styles.ownerActions}>
-              <TouchableOpacity style={styles.editPriceBtn} onPress={openPriceEditor}>
-                <Text style={styles.editPriceText}>✏️ Sửa giá</Text>
+            <View style={styles.btnRow}>
+              <TouchableOpacity style={[styles.actionBtn, styles.btnNeutral]} onPress={openPriceEditor}>
+                <Text style={styles.btnNeutralText}>✏️  Sửa giá</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.deletePinBtn} onPress={handleDeletePin}>
-                <Text style={styles.deletePinText}>🗑 Xoá ghim</Text>
+              <TouchableOpacity style={[styles.actionBtn, styles.btnDanger]} onPress={handleDeletePin}>
+                <Text style={styles.btnDangerText}>🗑  Xoá ghim</Text>
               </TouchableOpacity>
             </View>
           ) : null}
 
-          {selectedPin.has_video && (
+          {/* Liên hệ chủ nhà */}
+          <View style={styles.btnRow}>
             <TouchableOpacity
-              style={styles.videoBanner}
-              onPress={() => Alert.alert('Video thực tế', `Đang mở trình phát video thực tế căn nhà (${selectedPin.video_duration}).`)}
-            >
-              <Text style={styles.videoBannerText}>▶ Xem Video quay thực tế ({selectedPin.video_duration})</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Action Call & Zalo */}
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={styles.callBtn}
+              style={[styles.actionBtn, styles.btnCall]}
               onPress={() => handleCallOwner(selectedPin.contact_phone)}
             >
-              <Text style={styles.btnText}>📞 Gọi chủ nhà</Text>
+              <Text style={styles.btnCallText}>📞  Gọi chủ nhà</Text>
             </TouchableOpacity>
-
             <TouchableOpacity
-              style={styles.zaloBtn}
+              style={[styles.actionBtn, styles.btnZalo]}
               onPress={() => handleZaloOwner(selectedPin.contact_phone)}
             >
-              <Text style={styles.btnText}>💬 Nhắn Zalo</Text>
+              <Text style={styles.btnZaloText}>💬  Nhắn Zalo</Text>
             </TouchableOpacity>
           </View>
+          </ScrollView>
         </View>
       )}
+
+      {/* Xem full ảnh / video của ghim */}
+      <MediaViewer
+        visible={mediaViewerOpen}
+        items={pinMedia}
+        startIndex={mediaStartIndex}
+        onClose={() => setMediaViewerOpen(false)}
+      />
 
       {/* Danh sách ghim đã lưu + biến động giá */}
       <SavedPinsModal
@@ -1244,6 +1288,71 @@ const styles = StyleSheet.create({
   ownerBadgeOther: { backgroundColor: 'rgba(148,163,184,0.14)', borderColor: 'rgba(148,163,184,0.4)' },
   ownerBadgeText: { color: '#e2e8f0', fontSize: 10, fontWeight: '700' },
 
+  sheetTitleRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 6 },
+  verifiedCheck: {
+    width: 17,
+    height: 17,
+    borderRadius: 9,
+    backgroundColor: '#1d9bf0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifiedCheckText: { color: '#fff', fontSize: 10, fontWeight: '900', marginTop: -1 },
+  mineDot: {
+    width: 17,
+    height: 17,
+    borderRadius: 9,
+    backgroundColor: 'rgba(34,197,94,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mineDotText: { fontSize: 9 },
+
+  priceBlock: { marginTop: 12 },
+  priceHero: { color: '#22c55e', fontSize: 26, fontWeight: '900', letterSpacing: -0.4 },
+  pillRow: { flexDirection: 'row', gap: 6, marginTop: 7, flexWrap: 'wrap' },
+  pill: { backgroundColor: '#1e293b', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  pillText: { color: '#cbd5e1', fontSize: 11, fontWeight: '600' },
+
+  mediaWrap: { marginTop: 10 },
+
+  btnRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  actionBtn: { flex: 1, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  btnNeutral: { backgroundColor: '#1e293b', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
+  btnNeutralText: { color: '#e2e8f0', fontSize: 13, fontWeight: '700' },
+  btnDanger: { backgroundColor: 'rgba(239,68,68,0.12)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.55)' },
+  btnDangerText: { color: '#f87171', fontSize: 13, fontWeight: '700' },
+  btnCall: { backgroundColor: '#22c55e' },
+  btnCallText: { color: '#052e16', fontSize: 13, fontWeight: '800' },
+  btnZalo: { backgroundColor: '#2563eb' },
+  btnZaloText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
+
+  pinMine: {
+    backgroundColor: '#15803d',
+    borderColor: '#4ade80',
+    borderWidth: 2,
+    shadowColor: '#22c55e',
+    shadowOpacity: 0.55,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
+  },
+  pinPriceTextMine: { color: '#f0fdf4' },
+  mineMarkerDot: {
+    position: 'absolute',
+    top: -7,
+    right: -7,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#0b1220',
+    borderWidth: 1,
+    borderColor: '#4ade80',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mineMarkerDotText: { fontSize: 8 },
+
   savedHeaderBtn: {
     width: 44,
     height: 44,
@@ -1402,6 +1511,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
+    maxHeight: '76%',
     backgroundColor: '#0f172a',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -1410,6 +1520,15 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
     elevation: 10,
   },
+  sheetGrabber: {
+    alignSelf: 'center',
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    marginBottom: 12,
+  },
+  sheetScrollContent: { paddingBottom: 8 },
   sheetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
