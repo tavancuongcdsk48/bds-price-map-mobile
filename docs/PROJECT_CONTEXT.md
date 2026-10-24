@@ -122,7 +122,6 @@ pin_saves — chỉ chủ sở hữu; profiles — đọc công khai, update ch�
 13. Bắt đúng toà khi thả ghim (Photon + Overpass) — xem §8.
 
 ## 7. Giới hạn media đã chốt (chặn 2 lớp)
-
 | Lớp | Nơi cài | Nội dung |
 |---|---|---|
 | Client | `src/lib/mediaRules.ts` + `src/lib/imageCompress.ts` | tối đa **8 ảnh**/ghim, nén **WebP ≤ 300KB**, cạnh dài ≤ 1920px; video **≤ 45s** và **≤ 25MB**; chặn/gia hạn trước khi gửi |
@@ -200,3 +199,31 @@ DB nhanh: `docker exec supabase_db_AdIntel.dms psql -U postgres -d postgres -c "
 2. Sửa nhỏ, commit theo feature (message tiếng Việt không dấu như hiện tại).
 3. Xong việc = `npx tsc --noEmit` sạch + một lần kiểm chứng thật (script hoặc psql/curl) đính kèm kết quả.
 4. Hạ tầng hoặc quy ước thay đổi → cập nhật lại file này trong cùng commit.
+## 12. Địa chỉ chi tiết + bảng giá theo đơn vị hành chính (2026-10-25)
+
+**Địa chỉ khi thả ghim** (`src/services/reverseGeocode.ts`): thứ tự nguồn
+Google Geocoding (`EXPO_PUBLIC_GOOGLE_GEOCODING_KEY`, nếu có) → Photon → Nominatim.
+Kết quả trả cả `hamlet` (xóm/thôn/ấp), `ward`, `district`, `city` và `houseNumber`.
+`CreatePinModal.handleSave` **await reverse geocode** nếu ô địa chỉ còn trống, nên ghim mới không
+còn rơi về chữ "Ghim theo toạ độ bản đồ" (trước đây xảy ra khi người dùng bấm lưu trước khi geocode xong).
+
+**Bảng giá theo đơn vị hành chính** (`supabase/migrations/20261025_admin_area_price.sql`):
+- `pins` + `price_observations` thêm `admin_hamlet, admin_ward, admin_district, admin_city`.
+- Trigger `trg_sync_admin_area` đồng bộ 4 cột này từ `pins` xuống `price_observations`.
+- RPC `get_admin_area_price_history(p_hamlet, p_ward, p_district, p_city, p_type, p_months)` trả
+  `area_level` (hamlet/ward/district/city) + `area_name` + chuỗi tháng; chọn **đơn vị nhỏ nhất có dữ liệu**
+  theo thứ tự xóm/thôn → xã/phường → huyện → tỉnh.
+- Nút 📊 (`openAreaAnalysis`) đổi từ bán kính 400 m sang: lấy tâm bản đồ (hoặc ghim đang chọn) →
+  reverse geocode → gọi RPC hành chính; nếu chưa có dữ liệu mới lùi về bán kính 400 m.
+  Tab trong sheet hiển thị đúng tên đơn vị ("Masteri Waterfront", "Xã Gia Lâm", "Hà Nội"…).
+
+Kiểm chứng thật:
+
+```bash
+# bảng giá theo xóm/thôn (REST, anon key)
+curl -s -X POST "$EXPO_PUBLIC_SUPABASE_URL/rest/v1/rpc/get_admin_area_price_history" \
+  -H "apikey: $EXPO_PUBLIC_SUPABASE_ANON_KEY" -H "Authorization: Bearer $EXPO_PUBLIC_SUPABASE_ANON_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary '{"p_hamlet":"Masteri Waterfront","p_ward":null,"p_district":null,"p_city":null}'
+# → area_level=hamlet, 39 → 41 → 47 tr/m²
+```
