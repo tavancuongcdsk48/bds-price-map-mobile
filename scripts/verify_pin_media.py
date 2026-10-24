@@ -104,3 +104,45 @@ print("8) RPC get_pin_media_counts:", end=" ")
 st, cnt = req("POST", "/rest/v1/rpc/get_pin_media_counts", body={"p_pin_ids": [pin_id]})
 print("HTTP", st, "|", cnt if not isinstance(cnt, list) else
       f'ảnh={cnt[0]["images"]}, video={cnt[0]["videos"]}')
+
+# ---- Giới hạn media ở tầng DB (trigger trg_pin_media_limits + unique index video) ----
+url_base = BASE + "/storage/v1/object/public/pin-media/" + obj
+inserted = []
+
+
+def insert_media(rows, label):
+    global inserted
+    st, body = req("POST", "/rest/v1/pin_media", token=OWNER, body=rows,
+                   extra={"Prefer": "return=representation"})
+    ok = 200 <= st < 300
+    if ok and isinstance(body, list):
+        inserted += [r["id"] for r in body]
+    msg = str(body)[:90]
+    print(f"{label}: HTTP {st} | {msg}")
+    return ok, msg
+
+
+print("9) Gắn 8 ảnh trong 1 câu lệnh:", end=" ")
+insert_media([{"pin_id": pin_id, "media_type": "image", "url": f"{url_base}?i={i}", "sort_order": i}
+              for i in range(1, 9)], "9)")
+
+print("10) Ảnh thứ 9 (phải bị chặn):", end=" ")
+ok, msg = insert_media([{"pin_id": pin_id, "media_type": "image", "url": url_base}], "10)")
+print("    →", "CHẶN ĐÚNG" if not ok and "image_limit_reached" in msg else "SAI")
+
+print("11) Video đầu tiên + video thứ 2 (phải bị chặn):", end=" ")
+ok1, msg1 = insert_media([{"pin_id": pin_id, "media_type": "video", "url": url_base, "duration_seconds": 30}], "11a)")
+ok2, msg2 = insert_media([{"pin_id": pin_id, "media_type": "video", "url": url_base, "duration_seconds": 20}], "11b)")
+print("    →", "CHẶN ĐÚNG" if ok1 and not ok2 else "SAI")
+
+print("12) Video 60s (phải bị chặn):", end=" ")
+# Bỏ video 30s trước, nếu không unique index (1 video/ghim) sẽ chặn trước cả trigger thời lượng
+req("DELETE", f"/rest/v1/pin_media?pin_id=eq.{pin_id}&media_type=eq.video", token=OWNER)
+ok3, msg3 = insert_media([{"pin_id": pin_id, "media_type": "video", "url": url_base, "duration_seconds": 60}], "12)")
+print("    →", "CHẶN ĐÚNG" if not ok3 and "video_too_long" in msg3 else "SAI")
+
+if inserted:
+    ids = ",".join(inserted)
+    st, _ = req("DELETE", f"/rest/v1/pin_media?id=in.({ids})", token=OWNER)
+    print("13) Dọn media test: HTTP", st, f"({len(inserted)} dòng)")
+

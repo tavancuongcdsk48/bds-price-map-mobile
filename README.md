@@ -6,12 +6,13 @@ bong bóng giá từng căn, và đăng bán nhà của mình trong 60 giây.
 ## Tính năng MVP
 
 - Bản đồ toàn quốc + tự động bay về vị trí hiện tại (GPS)
-- Ghim giá do chủ nhà tự đăng: giá, diện tích, tự tính đơn giá tr/m², ảnh, video 45s
+- Ghim giá do chủ nhà tự đăng: giá, diện tích, tự tính đơn giá tr/m², ảnh (tối đa 8, tự nén WebP ≤ 300KB/ảnh), video thực tế ≤ 45s và ≤ 25MB
+- Giới hạn media chặn 2 lớp: client (`src/lib/mediaRules.ts`) + trigger DB (`supabase/migration_media_limits.sql`)
 - Bộ lọc theo loại hình (nhà phố / căn hộ), lọc ghim có video thật
-- Thẻ chi tiết: giá, diện tích, đơn giá/m², nút **Gọi** và **Nhắn Zalo** chủ nhà
+- Thẻ chi tiết: giá, diện tích, đơn giá/m², nút **Gọi** và **Nhắn Zalo** chủ nhà (khách chưa đăng nhập chỉ thấy số đã ẩn 4 số cuối, bấm vào sẽ được mời đăng nhập)
 - Tự đặt ghim chính xác trên bản đồ (không cần đứng tại căn nhà) bằng tâm ngắm
 - Làm mờ toạ độ công khai 50–100m để bảo vệ dữ liệu cá nhân; toạ độ chính xác chỉ lưu nội bộ
-- Chỉ người đã ghim mới sửa được giá: database kiểm tra `device_id` (khách) hoặc `auth.uid()` (đã đăng nhập)
+- Chỉ người đã ghim mới sửa được giá: database kiểm tra `auth.uid()` (RLS + RPC trả `not_pin_owner`), không dùng `device_id`
 - Mỗi lần đổi giá được ghi thành một mốc lịch sử, sẵn sàng cho biểu đồ giá theo tháng/năm
 
 ## Kiến trúc
@@ -49,7 +50,10 @@ src/components/CreatePinModal.tsx form đăng ghim + ảnh/video + tính giá/m�
 src/services/pinService.ts       truy vấn & ghi ghim qua Supabase PostGIS
 src/hooks/useGoogleAuth.ts       đăng nhập Google qua Supabase
 src/lib/supabase.ts              Supabase client + SecureStore adapter
+src/lib/mediaRules.ts            giới hạn media dùng chung (8 ảnh, 45s, 25MB) + mask số điện thoại
+src/lib/imageCompress.ts         nén ảnh về WebP ≤ 300KB ngay trên máy
 supabase_schema.sql              schema PostGIS, RPC, RLS
+supabase/migration_media_limits.sql  trigger + unique index chặn 8 ảnh / 1 video / 45s ở DB
 supabase/migration_rls_anon.sql  chính sách cho khách chưa đăng nhập (dev)
 .github/workflows/build-apk.yml  build APK + gắn vào GitHub Release
 ```

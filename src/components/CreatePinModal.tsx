@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { reverseGeocode } from '../services/reverseGeocode';
+import { MEDIA_LIMITS, clampImages, formatBytes, remainingImageSlots, validateVideo, videoDurationSeconds } from '../lib/mediaRules';
+import { compressImageToLimit } from '../lib/imageCompress';
 
 interface CreatePinModalProps {
   visible: boolean;
@@ -33,6 +35,7 @@ export interface NewPinData {
   address_text: string;
   images: string[];
   video_uri?: string;
+  video_duration_s?: number;
 }
 
 export const CreatePinModal: React.FC<CreatePinModalProps> = ({
@@ -51,6 +54,8 @@ export const CreatePinModal: React.FC<CreatePinModalProps> = ({
   const [address, setAddress] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [videoUri, setVideoUri] = useState<string | null>(null);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [mediaBusy, setMediaBusy] = useState(false);
   const [addrLoading, setAddrLoading] = useState(false);
   const [addrAuto, setAddrAuto] = useState(false);
   const lastAutoAddr = React.useRef('');
@@ -85,8 +90,16 @@ export const CreatePinModal: React.FC<CreatePinModalProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, pickedCoords?.latitude, pickedCoords?.longitude, currentCoords?.latitude, currentCoords?.longitude]);
 
-  // Chọn ảnh từ máy (Tối đa 6 ảnh)
+  // Chọn ảnh từ máy: tối đa 8 ảnh, nén WebP ≤ 300KB / ảnh ngay trên máy
   const pickImages = async () => {
+    if (mediaBusy) return;
+
+    const slots = remainingImageSlots(images.length);
+    if (slots <= 0) {
+      Alert.alert('Đủ ảnh rồi', `Mỗi ghim tối đa ${MEDIA_LIMITS.maxImages} ảnh. Xoá bớt nếu muốn thay ảnh khác.`);
+      return;
+    }
+
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Quyền truy cập', 'Vui lòng cấp quyền truy cập thư viện ảnh để đăng hình nhà.');
@@ -96,18 +109,52 @@ export const CreatePinModal: React.FC<CreatePinModalProps> = ({
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsMultipleSelection: true,
-      selectionLimit: 6,
-      quality: 0.8,
+      selectionLimit: slots,
+      quality: 1,
     });
 
-    if (!result.canceled && result.assets) {
-      const selectedUris = result.assets.map(a => a.uri);
-      setImages(prev => [...prev, ...selectedUris].slice(0, 6));
+    if (result.canceled || !result.assets?.length) return;
+
+    const picked = result.assets.slice(0, slots);
+    if (result.assets.length > slots) {
+      Alert.alert('Giới hạn ảnh', `Chỉ nhận thêm ${slots} ảnh, ${result.assets.length - slots} ảnh dư đã bỏ qua.`);
+    }
+
+    setMediaBusy(true);
+    const compressedUris: string[] = [];
+    let tooBig = 0;
+
+    for (const asset of picked) {
+      try {
+        const out = await compressImageToLimit({
+          uri: asset.uri,
+          width: asset.width,
+          height: asset.height,
+          fileSize: asset.fileSize,
+        });
+        if (out.bytes > MEDIA_LIMITS.maxImageBytes) tooBig += 1;
+        compressedUris.push(out.uri);
+      } catch {
+        // Nén lỗi → vẫn giữ ảnh gốc để không mất dữ liệu người dùng đã chọn
+        compressedUris.push(asset.uri);
+      }
+    }
+
+    setImages(prev => clampImages([...prev, ...compressedUris]));
+    setMediaBusy(false);
+
+    if (tooBig > 0) {
+      Alert.alert(
+        'Ảnh hơi nặng',
+        `${tooBig} ảnh vẫn còn trên ${formatBytes(MEDIA_LIMITS.maxImageBytes)} sau khi nén, tải lên sẽ chậm hơn.`
+      );
     }
   };
 
-  // Chọn video thực tế (Tối đa 45s)
+  // Chọn video thực tế: tối đa 45s và 25MB (giới hạn đã chốt trong mediaRules + trigger DB)
   const pickVideo = async () => {
+    if (mediaBusy) return;
+
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Quyền truy cập', 'Vui lòng cấp quyền truy cập để chọn video thực tế.');
@@ -116,13 +163,21 @@ export const CreatePinModal: React.FC<CreatePinModalProps> = ({
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['videos'],
-      videoMaxDuration: 45,
+      videoMaxDuration: MEDIA_LIMITS.maxVideoSeconds,
       quality: 0.7,
     });
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setVideoUri(result.assets[0].uri);
+    if (result.canceled || !result.assets?.length) return;
+
+    const asset = result.assets[0];
+    const check = validateVideo(asset as any);
+    if (!check.ok) {
+      Alert.alert('Video không hợp lệ', check.reason);
+      return;
     }
+
+    setVideoUri(asset.uri);
+    setVideoDuration(videoDurationSeconds(asset as any));
   };
 
   const handleSave = () => {
@@ -157,6 +212,7 @@ export const CreatePinModal: React.FC<CreatePinModalProps> = ({
       address_text: address.trim() || 'Ghim theo toạ độ bản đồ',
       images: images,
       video_uri: videoUri || undefined,
+      video_duration_s: videoUri ? videoDuration || MEDIA_LIMITS.maxVideoSeconds : undefined,
     });
 
     // Reset Form
@@ -169,6 +225,7 @@ export const CreatePinModal: React.FC<CreatePinModalProps> = ({
     setAddrAuto(false);
     setImages([]);
     setVideoUri(null);
+    setVideoDuration(0);
     onClose();
   };
 
@@ -306,20 +363,27 @@ export const CreatePinModal: React.FC<CreatePinModalProps> = ({
             </Text>
 
             {/* Chọn Ảnh & Video */}
-            <Text style={styles.label}>Ảnh thực tế căn nhà (Tối đa 6 ảnh)</Text>
+            <Text style={styles.label}>
+              Ảnh thực tế căn nhà (Tối đa {MEDIA_LIMITS.maxImages} ảnh, tự nén WebP ≤ {formatBytes(MEDIA_LIMITS.maxImageBytes)})
+            </Text>
             <View style={styles.mediaRow}>
-              <TouchableOpacity style={styles.addMediaBtn} onPress={pickImages}>
+              <TouchableOpacity style={styles.addMediaBtn} onPress={pickImages} disabled={mediaBusy}>
                 <Text style={styles.addMediaIcon}>📷</Text>
-                <Text style={styles.addMediaText}>Thêm ảnh ({images.length}/6)</Text>
+                <Text style={styles.addMediaText}>
+                  {mediaBusy ? 'Đang nén ảnh…' : `Thêm ảnh (${images.length}/${MEDIA_LIMITS.maxImages})`}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.addMediaBtn, videoUri ? styles.addMediaBtnActive : null]}
                 onPress={pickVideo}
+                disabled={mediaBusy}
               >
                 <Text style={styles.addMediaIcon}>🎥</Text>
                 <Text style={styles.addMediaText}>
-                  {videoUri ? 'Đã có video 45s ✓' : 'Thêm video'}
+                  {videoUri
+                    ? `Đã có video ${videoDuration || MEDIA_LIMITS.maxVideoSeconds}s ✓`
+                    : `Thêm video (≤${MEDIA_LIMITS.maxVideoSeconds}s, ≤${formatBytes(MEDIA_LIMITS.maxVideoBytes)})`}
                 </Text>
               </TouchableOpacity>
             </View>

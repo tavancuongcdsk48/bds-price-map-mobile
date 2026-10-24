@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { NewPinData } from '../components/CreatePinModal';
+import { MEDIA_LIMITS } from '../lib/mediaRules';
 
 export interface PinItem {
   id: string;
@@ -462,15 +463,22 @@ async function uploadOne(pinId: string, uri: string, kind: 'image' | 'video'): P
 export async function uploadPinMedia(
   pinId: string,
   images: string[],
-  videoUri?: string
+  videoUri?: string,
+  videoDurationSec?: number
 ): Promise<number> {
   let ok = 0;
-  const rows: { pin_id: string; media_type: string; url: string; duration_seconds: number }[] = [];
+  const rows: {
+    pin_id: string;
+    media_type: string;
+    url: string;
+    duration_seconds: number;
+    sort_order: number;
+  }[] = [];
 
-  for (const uri of images.slice(0, 8)) {
+  for (const [idx, uri] of images.slice(0, MEDIA_LIMITS.maxImages).entries()) {
     const url = await uploadOne(pinId, uri, 'image');
     if (url) {
-      rows.push({ pin_id: pinId, media_type: 'image', url, duration_seconds: 0 });
+      rows.push({ pin_id: pinId, media_type: 'image', url, duration_seconds: 0, sort_order: idx });
       ok += 1;
     }
   }
@@ -478,7 +486,13 @@ export async function uploadPinMedia(
   if (videoUri) {
     const url = await uploadOne(pinId, videoUri, 'video');
     if (url) {
-      rows.push({ pin_id: pinId, media_type: 'video', url, duration_seconds: 45 });
+      rows.push({
+        pin_id: pinId,
+        media_type: 'video',
+        url,
+        duration_seconds: Math.min(MEDIA_LIMITS.maxVideoSeconds, Math.max(0, Math.round(videoDurationSec || 0))),
+        sort_order: rows.length,
+      });
       ok += 1;
     }
   }

@@ -86,16 +86,29 @@ pin_saves — chỉ chủ sở hữu; profiles — đọc công khai, update ch�
 10. Ownership theo `auth.uid()`, AuthModal (Google + email fallback), xoá ghim.
 11. Tìm kiếm khu vực/dự án/ghim, 4 tab lọc gọn, sửa giá + biểu đồ, đặt ghim bằng tâm ngắm, làm mờ toạ độ.
 
-## 7. Việc còn mở / nợ kỹ thuật
+## 7. Giới hạn media đã chốt (chặn 2 lớp)
+
+| Lớp | Nơi cài | Nội dung |
+|---|---|---|
+| Client | `src/lib/mediaRules.ts` + `src/lib/imageCompress.ts` | tối đa **8 ảnh**/ghim, nén **WebP ≤ 300KB**, cạnh dài ≤ 1920px; video **≤ 45s** và **≤ 25MB**; chặn/gia hạn trước khi gửi |
+| DB | `supabase/migration_media_limits.sql` | trigger `trg_pin_media_limits` → `image_limit_reached`, `video_too_long`; unique index `pin_media_one_video_per_pin` (1 video/ghim); thêm cột `sort_order`, `file_size_bytes` |
+
+Kiểm chứng: `docker exec -i supabase_db_AdIntel.dms psql -U postgres -d postgres < scripts/verify_media_limits.sql`
+(8 ảnh 1 câu lệnh OK, ảnh 9 bị chặn, video 2 bị chặn, video 60s bị chặn — tự rollback)
++ `python scripts/verify_pin_media.py` (bước 9–13 kiểm qua REST API thật) + `node scripts/media_rules.test.mjs` (22 case logic).
+
+## 8. Việc còn mở / nợ kỹ thuật
 
 - `app.json` còn `android.config.googleMaps.apiKey` = placeholder → APK thật cần key.
-- `README.md` ghi Expo SDK 54, sai so với SDK 58; chưa mô tả `pin_saves`, `pin_media`, `get_my_pins`.
+- README đã sửa SDK 58, nhưng vẫn chưa mô tả hết `pin_saves`, `pin_media`, `get_my_pins`.
+- Chưa có Cloudflare R2 (plan V2 §2.2): media hiện nằm ở bucket Supabase Storage `pin-media`, không có egress 0đ.
+- Chưa sinh thumbnail từ frame giây thứ 2 của video (plan V2 §2.1); chưa có kiểm duyệt AI, chưa có OTP xác thực SĐT, chưa có phân hạng user (khách/thường/verified).
 - Tunnel quick đổi URL: cần kịch bản cố định (named tunnel) hoặc script cập nhật redirect tự động.
-- Chưa có test tự động cho UI; kiểm chứng hiện dựa vào script Python gọi thẳng REST (xem §8).
+- Chưa có test tự động cho UI; kiểm chứng hiện dựa vào script Python gọi thẳng REST (xem §9).
 - Các script verify hardcode `BASE = http://192.168.2.22:54321` + JWT secret → đổi mạng/IP là phải sửa.
 - `App.tsx` 1838 dòng: nên tách màn hình/lọc/thẻ chi tiết khi thêm tính năng lớn.
 
-## 8. Chạy & kiểm chứng
+## 9. Chạy & kiểm chứng
 
 ```bash
 cd C:/Users/PC/projects/bds-price-map-mobile
@@ -111,6 +124,8 @@ Kiểm chứng bằng bằng chứng thật (không claim suông):
 python scripts/verify_my_pins.py        # get_my_pins + set_pin_status + chặn đổi ghim người khác
 python scripts/verify_owner_account.py  # tên chủ ghim + xác thực tài khoản
 python scripts/verify_pin_media.py      # pin_media + get_pin_media_counts
+node scripts/media_rules.test.mjs       # 22 case logic giới hạn media + mask SĐT
+docker exec -i supabase_db_AdIntel.dms psql -U postgres -d postgres < scripts/verify_media_limits.sql  # trigger giới hạn media (tự rollback)
 python scripts/verify_saved_pins.py     # toggle_save_pin + get_my_saved_pins
 bash  scripts/enable_google_oauth.sh    # dựng lại container auth với Google provider
 ```
@@ -118,7 +133,7 @@ bash  scripts/enable_google_oauth.sh    # dựng lại container auth với Goog
 DB nhanh: `docker exec supabase_db_AdIntel.dms psql -U postgres -d postgres -c "select count(*) from pins;"`
 (hiện: 17 pins, 4 users, 3 saves, 4 profiles).
 
-## 9. Giao thức làm việc trong thread này
+## 10. Giao thức làm việc trong thread này
 
 1. Đọc file này + `git log --oneline -10` trước khi sửa.
 2. Sửa nhỏ, commit theo feature (message tiếng Việt không dấu như hiện tại).

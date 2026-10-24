@@ -13,7 +13,7 @@ import {
   Platform,
   TextInput
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE, PROVIDER_DEFAULT, Region } from 'react-native-maps';
+import MapView, { Marker, UrlTile, PROVIDER_GOOGLE, PROVIDER_DEFAULT, Region } from 'react-native-maps';
 
 /** 3_300_000_000 → "3,3 tỷ"; 2_450_000_000 → "2,45 tỷ" */
 const formatTy = (vnd: number) => {
@@ -50,6 +50,7 @@ import {
   PriceHistoryPoint
 } from './src/services/pinService';
 import { searchPlaces, PlaceResult } from './src/services/placeSearch';
+import { maskPhone } from './src/lib/mediaRules';
 
 type SearchRow = {
   key: string;
@@ -256,7 +257,7 @@ export default function App() {
 
     // Tải ảnh/video lên storage rồi gắn vào ghim vừa tạo
     if (saved && (data.images?.length || data.video_uri)) {
-      await uploadPinMedia(saved, data.images || [], data.video_uri);
+      await uploadPinMedia(saved, data.images || [], data.video_uri, data.video_duration_s);
     }
 
     // Refresh lại ghim trên bản đồ
@@ -644,10 +645,24 @@ export default function App() {
   };
 
   const handleCallOwner = (phone: string) => {
+    if (!isAuthenticated) {
+      Alert.alert('Cần đăng nhập', 'Số điện thoại chủ nhà chỉ hiện đầy đủ với tài khoản đã đăng nhập.', [
+        { text: 'Để sau', style: 'cancel' },
+        { text: 'Đăng nhập', onPress: () => setAuthModalVisible(true) },
+      ]);
+      return;
+    }
     Linking.openURL(`tel:${phone}`);
   };
 
   const handleZaloOwner = (phone: string) => {
+    if (!isAuthenticated) {
+      Alert.alert('Cần đăng nhập', 'Số Zalo chủ nhà chỉ hiện đầy đủ với tài khoản đã đăng nhập.', [
+        { text: 'Để sau', style: 'cancel' },
+        { text: 'Đăng nhập', onPress: () => setAuthModalVisible(true) },
+      ]);
+      return;
+    }
     Linking.openURL(`https://zalo.me/${phone}`);
   };
 
@@ -796,6 +811,8 @@ export default function App() {
         <MapView
           ref={mapRef}
           provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
+          // Android: nền Google cần API key có billing → dùng tile OSM miễn phí cho tới khi có key
+          mapType={Platform.OS === 'android' ? 'none' : 'standard'}
           style={styles.map}
           initialRegion={initialRegion}
           onRegionChangeComplete={(region) => {
@@ -808,6 +825,23 @@ export default function App() {
           showsMyLocationButton={false}
           showsCompass={false}
         >
+          {Platform.OS === 'android' && (
+            <>
+              {/* Nền bản đồ tối miễn phí (Esri ArcGIS), không cần API key */}
+              <UrlTile
+                urlTemplate="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+                maximumZ={19}
+                flipY={false}
+                tileSize={256}
+              />
+              <UrlTile
+                urlTemplate="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
+                maximumZ={19}
+                flipY={false}
+                tileSize={256}
+              />
+            </>
+          )}
           {filteredPins.map((pin) => (
             <Marker
               key={pin.id}
@@ -1038,7 +1072,12 @@ export default function App() {
           )}
 
 
-          {/* Liên hệ chủ nhà */}
+          {/* Liên hệ chủ nhà — khách chưa đăng nhập chỉ thấy số đã ẩn 4 số cuối */}
+          <Text style={styles.contactHint}>
+            {isAuthenticated
+              ? `📞 ${selectedPin.contact_phone}`
+              : `📞 ${maskPhone(selectedPin.contact_phone)} · đăng nhập để xem số đầy đủ`}
+          </Text>
           <View style={styles.btnRow}>
             <TouchableOpacity
               style={[styles.actionBtn, styles.btnCall]}
@@ -1489,6 +1528,7 @@ const styles = StyleSheet.create({
 
   mediaWrap: { marginTop: 10 },
 
+  contactHint: { color: '#94a3b8', fontSize: 12, marginTop: 12 },
   btnRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   btnSmallText: { color: '#e2e8f0', fontSize: 13, fontWeight: '700' },
   btnSave: { backgroundColor: '#1e293b', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
