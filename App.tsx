@@ -24,6 +24,7 @@ const formatTy = (vnd: number) => {
 import * as Location from 'expo-location';
 import { useGoogleAuth } from './src/hooks/useGoogleAuth';
 import { CreatePinModal, NewPinData } from './src/components/CreatePinModal';
+import { PriceAnalysisSheet } from './src/components/PriceAnalysisSheet';
 import { AuthModal } from './src/components/AuthModal';
 import { SavedPinsModal } from './src/components/SavedPinsModal';
 import { MediaStrip, MediaViewer } from './src/components/PinMedia';
@@ -166,6 +167,12 @@ export default function App() {
   const [priceHistory, setPriceHistory] = useState<PriceHistoryPoint[]>([]);
   // Lịch sử giá theo tháng của KHU VỰC (không phụ thuộc ghim còn hay đã xoá)
   const [areaHistory, setAreaHistory] = useState<AreaPricePoint[]>([]);
+  // Sheet "Phân tích giá" (2 tab: căn này / khu vực) — mở từ thẻ ghim hoặc từ nút 📊 trên bản đồ
+  const [analysisVisible, setAnalysisVisible] = useState(false);
+  const [analysisTab, setAnalysisTab] = useState<'pin' | 'area'>('pin');
+  const [mapAreaHistory, setMapAreaHistory] = useState<AreaPricePoint[]>([]);
+  const [mapAreaCenter, setMapAreaCenter] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [mapAreaLoading, setMapAreaLoading] = useState(false);
   const [priceEditVisible, setPriceEditVisible] = useState(false);
   const [myPinsVisible, setMyPinsVisible] = useState(false);
   const [myPins, setMyPins] = useState<MyPin[]>([]);
@@ -398,6 +405,24 @@ export default function App() {
   const cancelPickMode = () => {
     setPickMode(false);
     setCreateModalVisible(true);
+  };
+
+  // Phân tích giá khu vực quanh tâm bản đồ (không cần chọn ghim)
+  const openAreaAnalysis = async () => {
+    const center =
+      mapCenterRef.current ??
+      (location ? { latitude: location.latitude, longitude: location.longitude } : { latitude: 21.0335, longitude: 105.7942 });
+    setMapAreaCenter(center);
+    setAnalysisTab('area');
+    setAnalysisVisible(true);
+    if (mapAreaHistory.length > 0) return;
+    setMapAreaLoading(true);
+    try {
+      const rows = await fetchAreaPriceHistory(center.latitude, center.longitude, 400, null, 12);
+      setMapAreaHistory(rows);
+    } finally {
+      setMapAreaLoading(false);
+    }
   };
 
   // ---------- Tìm kiếm khu vực / dự án / ghim ----------
@@ -864,6 +889,9 @@ export default function App() {
               </Text>
             </TouchableOpacity>
           ))}
+          <TouchableOpacity style={styles.chartChip} onPress={openAreaAnalysis} accessibilityLabel="Phân tích giá khu vực">
+            <Text style={styles.chartChipText}>📊</Text>
+          </TouchableOpacity>
         </View>
       </View>
       )}
@@ -1087,90 +1115,39 @@ export default function App() {
             </View>
           )}
 
-          {/* Lịch sử giá — chỉ hiện khi đã có ít nhất 2 mốc (tức có đổi giá thật) */}
-          {priceHistory.length >= 2 && (
-            <View style={styles.historyBox}>
-              <View style={styles.historyHead}>
-                <Text style={styles.historyTitle}>Lịch sử giá</Text>
-                <Text style={styles.historyCount}>{priceHistory.length} mốc giá</Text>
-              </View>
-
-              <View style={styles.chartRow}>
-                {priceHistory.slice(-5).map((h, idx, arr) => {
-                  const max = Math.max(...arr.map((x) => x.price_vnd));
-                  const min = Math.min(...arr.map((x) => x.price_vnd));
-                  const ratio = max === min ? 0.6 : 0.3 + ((h.price_vnd - min) / (max - min)) * 0.7;
-                  const isLast = idx === arr.length - 1;
-                  const d = new Date(h.created_at);
-                  const price = formatTy(h.price_vnd);
-                  return (
-                    <View key={`${h.created_at}-${idx}`} style={styles.chartCol}>
-                      <Text
-                        style={[styles.chartValue, isLast && styles.chartValueLast]}
-                        numberOfLines={1}
-                        adjustsFontSizeToFit
-                        minimumFontScale={0.7}
-                      >
-                        {price}
-                      </Text>
-                      <View
-                        style={[
-                          styles.chartBar,
-                          { height: Math.round(40 * ratio), backgroundColor: isLast ? '#22c55e' : '#334155' },
-                        ]}
-                      />
-                      <Text style={styles.chartLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-                        {`${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
-          )}
-
-
-          {/* Giá/m² của KHU VỰC theo từng tháng — dữ liệu còn nguyên kể cả khi
-              chủ nhà xoá ghim hoặc đổi giá, vì nó neo vào vị trí chứ không neo vào ghim. */}
-          {areaHistory.length >= 2 && (
-            <View style={styles.historyBox}>
-              <View style={styles.historyHead}>
-                <Text style={styles.historyTitle}>Giá/m² khu vực · 400 m</Text>
-                <Text style={styles.historyCount}>
-                  {areaHistory[areaHistory.length - 1].n_pins} ghim đang treo
+          {/* Xu hướng giá — gói trong 1 dòng, bấm mở sheet "Phân tích giá" (2 tab) */}
+          {(priceHistory.length >= 2 || areaHistory.length >= 2) && (
+            <TouchableOpacity
+              style={styles.trendRow}
+              onPress={() => {
+                setAnalysisTab(priceHistory.length >= 2 ? 'pin' : 'area');
+                setAnalysisVisible(true);
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.trendTitle}>📈 Lịch sử giá</Text>
+                <Text style={styles.trendSub} numberOfLines={1}>
+                  {(() => {
+                    const parts: string[] = [];
+                    if (priceHistory.length >= 2) {
+                      const first = priceHistory[0].price_vnd;
+                      const last = priceHistory[priceHistory.length - 1].price_vnd;
+                      const pc = first > 0 ? ((last - first) / first) * 100 : null;
+                      parts.push(
+                        `${priceHistory.length} mốc` +
+                          (pc === null ? '' : ` · ${pc >= 0 ? '+' : ''}${pc.toFixed(1).replace('.', ',')}%`)
+                      );
+                    }
+                    const lastArea = areaHistory[areaHistory.length - 1];
+                    if (lastArea && lastArea.median_ppm2 > 0) {
+                      parts.push(`khu vực ${Math.round(lastArea.median_ppm2 / 1000000)} tr/m²`);
+                    }
+                    return parts.join('  ·  ');
+                  })()}
                 </Text>
               </View>
-              <View style={styles.chartRow}>
-                {areaHistory.slice(-6).map((h, idx, arr) => {
-                  const max = Math.max(...arr.map((x) => x.median_ppm2));
-                  const min = Math.min(...arr.map((x) => x.median_ppm2));
-                  const ratio = max === min ? 0.6 : 0.3 + ((h.median_ppm2 - min) / (max - min)) * 0.7;
-                  const isLast = idx === arr.length - 1;
-                  const [yy, mm] = h.month.split('-');
-                  return (
-                    <View key={h.month} style={styles.chartCol}>
-                      <Text
-                        style={[styles.chartValue, isLast && styles.chartValueLast]}
-                        numberOfLines={1}
-                        adjustsFontSizeToFit
-                        minimumFontScale={0.7}
-                      >
-                        {`${Math.round(h.median_ppm2 / 1000000)}tr`}
-                      </Text>
-                      <View
-                        style={[
-                          styles.chartBar,
-                          { height: Math.round(40 * ratio), backgroundColor: isLast ? '#38bdf8' : '#1e3a5f' },
-                        ]}
-                      />
-                      <Text style={styles.chartLabel} numberOfLines={1}>
-                        {`T${Number(mm)}/${yy.slice(2)}`}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
+              <Text style={styles.trendAction}>Xem ›</Text>
+            </TouchableOpacity>
           )}
 
           {/* Liên hệ chủ nhà — khách chưa đăng nhập chỉ thấy số đã ẩn 4 số cuối */}
@@ -1291,6 +1268,19 @@ export default function App() {
         </View>
       )}
 
+      {/* Sheet Phân tích giá: 2 tab (căn này / khu vực) */}
+      <PriceAnalysisSheet
+        visible={analysisVisible}
+        onClose={() => setAnalysisVisible(false)}
+        initialTab={analysisTab}
+        pinTitle={selectedPin?.title ?? null}
+        pinHistory={priceHistory}
+        areaHistory={analysisTab === 'area' && !selectedPin ? mapAreaHistory : areaHistory}
+        areaRadiusM={400}
+        areaLabel={mapAreaCenter ? `Quanh ${mapAreaCenter.latitude.toFixed(4)}, ${mapAreaCenter.longitude.toFixed(4)}` : null}
+        loading={mapAreaLoading}
+      />
+
       {/* Modal Đăng Ghim Cho Chủ Nhà (Ảnh & Video) */}
       <CreatePinModal
         visible={createModalVisible && !pickMode}
@@ -1360,9 +1350,33 @@ const styles = StyleSheet.create({
   searchClose: { alignItems: 'center', paddingVertical: 8 },
   searchCloseText: { color: '#64748b', fontSize: 12 },
 
-  historyBox: {
+  trendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginTop: 12,
     backgroundColor: 'rgba(15,23,42,0.6)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  trendTitle: { color: '#e2e8f0', fontSize: 13, fontWeight: '700' },
+  trendSub: { color: '#64748b', fontSize: 11, marginTop: 3 },
+  trendAction: { color: '#38bdf8', fontSize: 12, fontWeight: '700', marginLeft: 10 },
+  chartChip: {
+    width: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    backgroundColor: 'rgba(56,189,248,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(56,189,248,0.4)',
+  },
+  chartChipText: { fontSize: 15 },
+
+  historyBox: {
+    marginTop: 12,    backgroundColor: 'rgba(15,23,42,0.6)',
     borderRadius: 12,
     padding: 10,
     borderWidth: 1,
