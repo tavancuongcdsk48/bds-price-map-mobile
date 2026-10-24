@@ -27,6 +27,7 @@ import { CreatePinModal, NewPinData } from './src/components/CreatePinModal';
 import { AuthModal } from './src/components/AuthModal';
 import { SavedPinsModal } from './src/components/SavedPinsModal';
 import { MediaStrip, MediaViewer } from './src/components/PinMedia';
+import { MyPinsModal } from './src/components/MyPinsModal';
 import {
   fetchPinsInBounds,
   searchPinsByText,
@@ -40,6 +41,9 @@ import {
   fetchPinMedia,
   uploadPinMedia,
   PinMediaItem,
+  fetchMyPins,
+  setPinStatus,
+  MyPin,
   SavedPin,
   PinItem,
   PriceHistoryPoint
@@ -150,6 +154,9 @@ export default function App() {
   // Lịch sử giá của ghim đang mở
   const [priceHistory, setPriceHistory] = useState<PriceHistoryPoint[]>([]);
   const [priceEditVisible, setPriceEditVisible] = useState(false);
+  const [myPinsVisible, setMyPinsVisible] = useState(false);
+  const [myPins, setMyPins] = useState<MyPin[]>([]);
+  const [myPinsLoading, setMyPinsLoading] = useState(false);
   const [authModalVisible, setAuthModalVisible] = useState(false);
   const [savedVisible, setSavedVisible] = useState(false);
   const [savedItems, setSavedItems] = useState<SavedPin[]>([]);
@@ -470,6 +477,103 @@ export default function App() {
     await loadSavedPins();
   };
 
+  // ---------- Tab "Ghim của tôi": quản lý khi một người có nhiều ghim ----------
+  const loadMyPins = async () => {
+    setMyPinsLoading(true);
+    const list = await fetchMyPins();
+    setMyPins(list);
+    setMyPinsLoading(false);
+  };
+
+  useEffect(() => {
+    if (isAuthenticated && user?.id) {
+      loadMyPins();
+    } else {
+      setMyPins([]);
+    }
+  }, [isAuthenticated, user?.id]);
+
+  const openMyPins = async () => {
+    if (!isAuthenticated) {
+      setAuthModalVisible(true);
+      return;
+    }
+    setMyPinsVisible(true);
+    await loadMyPins();
+  };
+
+  const myPinToItem = (p: MyPin): PinItem => ({
+    id: p.id,
+    user_id: user?.id || '',
+    title: p.title,
+    price_vnd: p.price_vnd,
+    price_display: formatTy(p.price_vnd),
+    price_per_m2_display: `${Math.round(p.price_per_m2 / 1_000_000)} tr/m²`,
+    area_m2: p.area_m2,
+    latitude: p.latitude,
+    longitude: p.longitude,
+    property_type: (p.property_type as PinItem['property_type']) || 'can-ho',
+    has_video: p.videos > 0,
+    video_duration: p.videos > 0 ? '0:45' : undefined,
+    contact_phone: '',
+    address_text: p.address_text,
+    is_verified: true,
+    owner_name: user?.email?.split('@')[0] || 'Bạn',
+    is_mine: true,
+    is_saved: false,
+  });
+
+  const handleMyPinOpenOnMap = (p: MyPin) => {
+    setMyPinsVisible(false);
+    setSelectedPin(myPinToItem(p));
+    mapRef.current?.animateToRegion(
+      { latitude: p.latitude, longitude: p.longitude, latitudeDelta: 0.012, longitudeDelta: 0.012 },
+      500
+    );
+  };
+
+  const handleMyPinEditPrice = (p: MyPin) => {
+    setMyPinsVisible(false);
+    setSelectedPin(myPinToItem(p));
+    setPriceEditVisible(true);
+  };
+
+  const handleMyPinChangeStatus = async (p: MyPin, status: string) => {
+    const ok = await setPinStatus(p.id, status);
+    if (!ok) {
+      Alert.alert('Chưa đổi được', 'Máy chủ từ chối. Kiểm tra kết nối rồi thử lại.');
+      return;
+    }
+    await loadMyPins();
+    await loadPins();
+    if (selectedPin?.id === p.id) setSelectedPin(null);
+  };
+
+  const handleMyPinDelete = (p: MyPin) => {
+    Alert.alert(
+      'Xoá ghim này?',
+      `${p.title}\nGhim sẽ biến mất khỏi bản đồ. Lịch sử giá vẫn được giữ lại.`,
+      [
+        { text: 'Huỷ', style: 'cancel' },
+        {
+          text: 'Xoá ghim',
+          style: 'destructive',
+          onPress: async () => {
+            const result = await deletePin(p.id);
+            if (result === 'ok') {
+              await loadMyPins();
+              await loadPins();
+              if (selectedPin?.id === p.id) setSelectedPin(null);
+              return;
+            }
+            Alert.alert('Chưa xoá được', result === 'not_owner' ? 'Chỉ chủ ghim mới được xoá.' : 'Thử lại sau.');
+          },
+        },
+      ]
+    );
+  };
+
+  // ---------- Lưu ghim ----------
   const handleToggleSave = async (pin: PinItem) => {
     if (!isAuthenticated) {
       setAuthModalVisible(true);
@@ -571,6 +675,15 @@ export default function App() {
             />
             {searching && <ActivityIndicator size="small" color="#22c55e" />}
           </View>
+          <TouchableOpacity style={styles.savedHeaderBtn} onPress={openMyPins}>
+            <Text style={styles.savedHeaderIcon}>📋</Text>
+            {myPins.length > 0 && (
+              <View style={styles.savedBadge}>
+                <Text style={styles.savedBadgeText}>{myPins.length > 99 ? '99+' : myPins.length}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.savedHeaderBtn} onPress={openSavedList}>
             <Text style={styles.savedHeaderIcon}>❤</Text>
             {savedCount > 0 && (
@@ -932,6 +1045,19 @@ export default function App() {
         items={pinMedia}
         startIndex={mediaStartIndex}
         onClose={() => setMediaViewerOpen(false)}
+      />
+
+      {/* Quản lý toàn bộ ghim của tôi */}
+      <MyPinsModal
+        visible={myPinsVisible}
+        pins={myPins}
+        loading={myPinsLoading}
+        onClose={() => setMyPinsVisible(false)}
+        onRefresh={loadMyPins}
+        onOpenOnMap={handleMyPinOpenOnMap}
+        onEditPrice={handleMyPinEditPrice}
+        onDelete={handleMyPinDelete}
+        onChangeStatus={handleMyPinChangeStatus}
       />
 
       {/* Danh sách ghim đã lưu + biến động giá */}

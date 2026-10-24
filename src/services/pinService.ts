@@ -323,6 +323,74 @@ export async function setSaveNote(pinId: string, note: string): Promise<boolean>
   }
 }
 
+// 11. Tab "Ghim của tôi"
+export interface MyPin {
+  id: string;
+  title: string;
+  property_type: string;
+  price_vnd: number;
+  area_m2: number;
+  price_per_m2: number;
+  address_text: string;
+  status: string;
+  latitude: number;
+  longitude: number;
+  images: number;
+  videos: number;
+  saves_count: number;
+  price_changes: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function fetchMyPins(): Promise<MyPin[]> {
+  try {
+    const { data, error } = await supabase.rpc('get_my_pins');
+    if (error) {
+      console.warn('Lỗi lấy ghim của tôi:', error.message);
+      return [];
+    }
+    return ((data as any[]) || []).map((r) => ({
+      id: r.id,
+      title: r.title,
+      property_type: r.property_type,
+      price_vnd: Number(r.price_vnd),
+      area_m2: Number(r.area_m2),
+      price_per_m2: Number(r.price_per_m2),
+      address_text: r.address_text,
+      status: r.status || 'active',
+      latitude: Number(r.latitude),
+      longitude: Number(r.longitude),
+      images: Number(r.images || 0),
+      videos: Number(r.videos || 0),
+      saves_count: Number(r.saves_count || 0),
+      price_changes: Number(r.price_changes || 0),
+      created_at: r.created_at,
+      updated_at: r.updated_at,
+    }));
+  } catch (err) {
+    console.warn('Lỗi ghim của tôi:', err);
+    return [];
+  }
+}
+
+export async function setPinStatus(pinId: string, status: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc('set_pin_status', {
+      p_pin_id: pinId,
+      p_status: status,
+    });
+    if (error) {
+      console.warn('Lỗi đổi trạng thái:', error.message);
+      return false;
+    }
+    return Boolean(data);
+  } catch (err) {
+    console.warn('Lỗi đổi trạng thái:', err);
+    return false;
+  }
+}
+
 // 9. Ảnh/video của một ghim
 export interface PinMediaItem {
   id: string;
