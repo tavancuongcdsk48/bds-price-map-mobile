@@ -10,6 +10,7 @@ import {
   ScrollView,
   Alert,
   Linking,
+  Share,
   Platform,
   TextInput
 } from 'react-native';
@@ -597,6 +598,23 @@ export default function App() {
     }
   }, [isAuthenticated, user?.id]);
 
+  // Mở ghim từ deep link chia sẻ: vutruchuyennhuong://pin/<id>
+  useEffect(() => {
+    const openById = (url: string | null | undefined) => {
+      if (!url) return;
+      const m = url.match(/pin\/([0-9a-f-]{36})/i);
+      if (!m) return;
+      const pin = pinsList.find((p) => p.id === m[1]);
+      if (pin) {
+        setSelectedPin(pin);
+        mapCenterRef.current = { latitude: pin.latitude, longitude: pin.longitude };
+      }
+    };
+    const sub = Linking.addEventListener('url', (e) => openById(e.url));
+    Linking.getInitialURL().then(openById);
+    return () => sub.remove();
+  }, [pinsList]);
+
   const openMyPins = async () => {
     if (!isAuthenticated) {
       setAuthModalVisible(true);
@@ -756,6 +774,28 @@ export default function App() {
       return;
     }
     Linking.openURL(`https://zalo.me/${phone}`);
+  };
+
+  const handleSharePin = async () => {
+    const pin = selectedPin;
+    if (!pin) return;
+    const deepLink = `vutruchuyennhuong://pin/${pin.id}`;
+    const msg =
+      `🏠 ${pin.title}\n` +
+      `💰 ${formatTy(pin.price_vnd)} · ${pin.area_m2}m² · ${pin.property_type}\n` +
+      `📍 ${pin.address_text || ''}\n` +
+      `Xem chi tiết: ${deepLink}\n` +
+      `Tải app Vũ Trụ Chuyển Nhượng để xem bản đồ giá BĐS.`;
+    try {
+      await Share.share({
+        title: 'Chia sẻ ghim',
+        message: msg,
+        url: deepLink,
+      });
+    } catch (e) {
+      // người dùng huỷ hoặc không có app share
+      Alert.alert('Không mở được chia sẻ', msg, [{ text: 'OK' }]);
+    }
   };
 
   const filteredPins = pinsList.filter(p => {
@@ -1136,6 +1176,12 @@ export default function App() {
               onPress={() => handleZaloOwner(selectedPin.contact_phone)}
             >
               <Text style={styles.btnZaloText}>💬  Nhắn Zalo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.btnShare]}
+              onPress={handleSharePin}
+            >
+              <Text style={styles.btnShareText}>🔗  Chia sẻ ghim</Text>
             </TouchableOpacity>
           </View>
 
@@ -1628,6 +1674,8 @@ const styles = StyleSheet.create({
   btnDangerText: { color: '#f87171', fontSize: 13, fontWeight: '700' },
   btnCall: { backgroundColor: '#22c55e' },
   btnCallText: { color: '#052e16', fontSize: 13, fontWeight: '800' },
+  btnShare: { backgroundColor: '#6366f1' },
+  btnShareText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
   directionsBtn: {
     marginTop: 8,
     minHeight: 44,
