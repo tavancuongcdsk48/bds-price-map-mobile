@@ -7,7 +7,6 @@
     "expo": "~58.0.19",
     "expo-auth-session": "~58.0.14",
     "expo-build-properties": "~58.0.11",
-    "expo-clipboard": "~58.0.4",
     "expo-crypto": "~58.0.7",
     "expo-image-manipulator": "~58.0.15",
     "expo-image-picker": "~58.0.10",
