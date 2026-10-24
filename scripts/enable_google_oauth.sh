@@ -9,7 +9,9 @@
 set -euo pipefail
 
 CONT="${AUTH_CONTAINER:-supabase_auth_AdIntel.dms}"
-NET="${SUPABASE_NETWORK:-}"
+NET="${SUPABASE_NETWORK:-supabase_network_AdIntel.dms}"
+SCRATCH="C:/Users/PC/AppData/Local/hermes/cache/scratch"
+APP_REDIRECT="${APP_REDIRECT:-exp://192.168.2.22:8081/--/auth/callback}"
 URL=""
 
 # 1) Lấy tunnel URL
@@ -23,11 +25,13 @@ fi
 URL="${URL%/}"
 CALLBACK="$URL/auth/v1/callback"
 
-echo "Callback sẽ đăng ký với Google: $CALLBACK"
-echo
-read -r -p "Google Client ID: " CID
-read -r -s -p "Google Client Secret (không hiện): " CSEC
-echo
+CID="${GID:-}"
+if [ -z "$CID" ]; then read -r -p "Google Client ID: " CID; fi
+CSEC="${GCSEC:-}"
+if [ -z "$CSEC" ]; then
+  read -r -s -p "Google Client Secret (không hiện): " CSEC
+  echo
+fi
 
 if [ -z "$CID" ] || [ -z "$CSEC" ]; then
   echo "Thiếu Client ID hoặc Secret — dừng." >&2
@@ -40,17 +44,18 @@ if [ -z "$NET" ]; then
   NET="$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$CONT")"
 fi
 # Docker là chương trình Windows gốc nên KHÔNG đọc được /tmp của MSYS — dùng đường dẫn Windows
-ENVF="${TMPDIR:-C:/Users/PC/AppData/Local/hermes/cache/scratch}/auth_env_$$.txt"
+mkdir -p "$SCRATCH"
+ENVF="$SCRATCH/auth_env_$$.txt"
 docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$CONT" \
-  | grep -vE '^GOTRUE_EXTERNAL_GOOGLE_|^GOTRUE_SITE_URL=' > "$ENVF"
+  | grep -vE '^GOTRUE_EXTERNAL_GOOGLE_|^GOTRUE_SITE_URL=|^GOTRUE_URI_ALLOW_LIST=' > "$ENVF"
 
 {
-  echo "GOTRUE_SITE_URL=$URL"
+  echo "GOTRUE_SITE_URL=$APP_REDIRECT"
   echo "GOTRUE_EXTERNAL_GOOGLE_ENABLED=true"
   echo "GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID=$CID"
   echo "GOTRUE_EXTERNAL_GOOGLE_SECRET=$CSEC"
   echo "GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI=$CALLBACK"
-  echo "GOTRUE_URI_ALLOW_LIST=vutruchuyennhuong://auth/callback,$URL/**,http://192.168.2.22:8081/**,exp://192.168.2.22:8081/--/auth/callback,exp://**"
+  echo "GOTRUE_URI_ALLOW_LIST=$APP_REDIRECT,exp://*,vutruchuyennhuong://auth/callback,vutruchuyennhuong://*,$URL/*"
 } >> "$ENVF"
 
 echo "Image: $IMG | Network: $NET"
