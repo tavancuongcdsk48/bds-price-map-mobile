@@ -14,7 +14,7 @@ import {
   Platform,
   TextInput
 } from 'react-native';
-import MapView, { Marker, UrlTile, PROVIDER_GOOGLE, PROVIDER_DEFAULT, Region } from 'react-native-maps';
+import MapView, { Marker, UrlTile, Polyline, Polygon, PROVIDER_GOOGLE, PROVIDER_DEFAULT, Region } from 'react-native-maps';
 
 /** 3_300_000_000 → "3,3 tỷ"; 2_450_000_000 → "2,45 tỷ" */
 const formatTy = (vnd: number) => {
@@ -26,6 +26,7 @@ import * as Location from 'expo-location';
 import { useGoogleAuth } from './src/hooks/useGoogleAuth';
 import { CreatePinModal, NewPinData } from './src/components/CreatePinModal';
 import { PriceAnalysisSheet } from './src/components/PriceAnalysisSheet';
+import oceanParkLayout from './src/data/oceanParkWireframe.json';
 import { AuthModal } from './src/components/AuthModal';
 import { SavedPinsModal } from './src/components/SavedPinsModal';
 import { MediaStrip, MediaViewer } from './src/components/PinMedia';
@@ -1011,6 +1012,37 @@ export default function App() {
                 </Text>
               </View>
             </Marker>
+          ))}
+          {/* Layer Vector GPS: Bo viền ranh giới & trục đường mặt bằng Ocean Park */}
+          {oceanParkLayout.lines.map((l) => (
+            <Polyline
+              key={l.id}
+              coordinates={l.coordinates}
+              strokeColor="rgba(56, 189, 248, 0.75)"
+              strokeWidth={2}
+            />
+          ))}
+
+          {/* Layer Vector GPS: Bo viền từng lô biệt thự Đảo Ngọc Trai */}
+          {oceanParkLayout.plots.map((p) => (
+            <Polygon
+              key={p.code}
+              coordinates={p.coordinates}
+              strokeColor={p.type === 'biet-thu-don-lap' ? '#10b981' : '#a855f7'}
+              fillColor={p.type === 'biet-thu-don-lap' ? 'rgba(16, 185, 129, 0.18)' : 'rgba(168, 85, 247, 0.18)'}
+              strokeWidth={1.5}
+            />
+          ))}
+
+          {/* Layer Vector GPS: Bo viền layout các khối toà chung cư (Sapphire / Masteri) */}
+          {oceanParkLayout.buildings.map((b) => (
+            <Polygon
+              key={b.code}
+              coordinates={b.coordinates}
+              strokeColor="#f59e0b"
+              fillColor="rgba(245, 158, 11, 0.22)"
+              strokeWidth={2}
+            />
           ))}
         </MapView>
       )}

@@ -1,0 +1,784 @@
+{
+  "lines": [
+    {
+      "id": "shoreline-island",
+      "name": "Bờ kè Đảo Ngọc Trai",
+      "coordinates": [
+        {
+          "latitude": 20.9902,
+          "longitude": 105.946
+        },
+        {
+          "latitude": 20.9908,
+          "longitude": 105.9485
+        },
+        {
+          "latitude": 20.9915,
+          "longitude": 105.9512
+        },
+        {
+          "latitude": 20.993,
+          "longitude": 105.9522
+        },
+        {
+          "latitude": 20.9945,
+          "longitude": 105.952
+        },
+        {
+          "latitude": 20.9952,
+          "longitude": 105.9505
+        },
+        {
+          "latitude": 20.994,
+          "longitude": 105.9475
+        },
+        {
+          "latitude": 20.9925,
+          "longitude": 105.9458
+        },
+        {
+          "latitude": 20.9902,
+          "longitude": 105.946
+        }
+      ]
+    },
+    {
+      "id": "road-nt-main",
+      "name": "Trục đường chính Ngọc Trai",
+      "coordinates": [
+        {
+          "latitude": 20.9908,
+          "longitude": 105.9455
+        },
+        {
+          "latitude": 20.992,
+          "longitude": 105.947
+        },
+        {
+          "latitude": 20.9932,
+          "longitude": 105.9485
+        },
+        {
+          "latitude": 20.9942,
+          "longitude": 105.9498
+        }
+      ]
+    }
+  ],
+  "plots": [
+    {
+      "code": "NT01-02",
+      "type": "biet-thu-don-lap",
+      "area_m2": 339.0,
+      "coordinates": [
+        {
+          "latitude": 20.9915,
+          "longitude": 105.9492
+        },
+        {
+          "latitude": 20.99166,
+          "longitude": 105.94933
+        },
+        {
+          "latitude": 20.99158,
+          "longitude": 105.94944000000001
+        },
+        {
+          "latitude": 20.991419999999998,
+          "longitude": 105.94931000000001
+        },
+        {
+          "latitude": 20.9915,
+          "longitude": 105.9492
+        }
+      ]
+    },
+    {
+      "code": "NT01-04",
+      "type": "biet-thu-don-lap",
+      "area_m2": 306.0,
+      "coordinates": [
+        {
+          "latitude": 20.991719999999997,
+          "longitude": 105.94938
+        },
+        {
+          "latitude": 20.99188,
+          "longitude": 105.94951
+        },
+        {
+          "latitude": 20.991799999999998,
+          "longitude": 105.94962000000001
+        },
+        {
+          "latitude": 20.991639999999997,
+          "longitude": 105.94949000000001
+        },
+        {
+          "latitude": 20.991719999999997,
+          "longitude": 105.94938
+        }
+      ]
+    },
+    {
+      "code": "NT01-06",
+      "type": "biet-thu-don-lap",
+      "area_m2": 306.0,
+      "coordinates": [
+        {
+          "latitude": 20.99194,
+          "longitude": 105.94956
+        },
+        {
+          "latitude": 20.9921,
+          "longitude": 105.94969
+        },
+        {
+          "latitude": 20.99202,
+          "longitude": 105.94980000000001
+        },
+        {
+          "latitude": 20.99186,
+          "longitude": 105.94967000000001
+        },
+        {
+          "latitude": 20.99194,
+          "longitude": 105.94956
+        }
+      ]
+    },
+    {
+      "code": "NT01-08",
+      "type": "biet-thu-don-lap",
+      "area_m2": 339.0,
+      "coordinates": [
+        {
+          "latitude": 20.99216,
+          "longitude": 105.94974
+        },
+        {
+          "latitude": 20.99232,
+          "longitude": 105.94987
+        },
+        {
+          "latitude": 20.99224,
+          "longitude": 105.94998000000001
+        },
+        {
+          "latitude": 20.992079999999998,
+          "longitude": 105.94985000000001
+        },
+        {
+          "latitude": 20.99216,
+          "longitude": 105.94974
+        }
+      ]
+    },
+    {
+      "code": "NT01-10",
+      "type": "biet-thu-don-lap",
+      "area_m2": 306.0,
+      "coordinates": [
+        {
+          "latitude": 20.992379999999997,
+          "longitude": 105.94992
+        },
+        {
+          "latitude": 20.992539999999998,
+          "longitude": 105.95005
+        },
+        {
+          "latitude": 20.992459999999998,
+          "longitude": 105.95016000000001
+        },
+        {
+          "latitude": 20.992299999999997,
+          "longitude": 105.95003000000001
+        },
+        {
+          "latitude": 20.992379999999997,
+          "longitude": 105.94992
+        }
+      ]
+    },
+    {
+      "code": "NT01-12",
+      "type": "biet-thu-don-lap",
+      "area_m2": 306.0,
+      "coordinates": [
+        {
+          "latitude": 20.9926,
+          "longitude": 105.9501
+        },
+        {
+          "latitude": 20.99276,
+          "longitude": 105.95023
+        },
+        {
+          "latitude": 20.99268,
+          "longitude": 105.95034000000001
+        },
+        {
+          "latitude": 20.99252,
+          "longitude": 105.95021000000001
+        },
+        {
+          "latitude": 20.9926,
+          "longitude": 105.9501
+        }
+      ]
+    },
+    {
+      "code": "NT01-14",
+      "type": "biet-thu-don-lap",
+      "area_m2": 339.0,
+      "coordinates": [
+        {
+          "latitude": 20.99282,
+          "longitude": 105.95028
+        },
+        {
+          "latitude": 20.99298,
+          "longitude": 105.95041
+        },
+        {
+          "latitude": 20.9929,
+          "longitude": 105.95052000000001
+        },
+        {
+          "latitude": 20.992739999999998,
+          "longitude": 105.95039000000001
+        },
+        {
+          "latitude": 20.99282,
+          "longitude": 105.95028
+        }
+      ]
+    },
+    {
+      "code": "NT01-16",
+      "type": "biet-thu-don-lap",
+      "area_m2": 306.0,
+      "coordinates": [
+        {
+          "latitude": 20.993039999999997,
+          "longitude": 105.95046
+        },
+        {
+          "latitude": 20.993199999999998,
+          "longitude": 105.95059
+        },
+        {
+          "latitude": 20.993119999999998,
+          "longitude": 105.95070000000001
+        },
+        {
+          "latitude": 20.992959999999997,
+          "longitude": 105.95057000000001
+        },
+        {
+          "latitude": 20.993039999999997,
+          "longitude": 105.95046
+        }
+      ]
+    },
+    {
+      "code": "NT01-18",
+      "type": "biet-thu-don-lap",
+      "area_m2": 306.0,
+      "coordinates": [
+        {
+          "latitude": 20.99326,
+          "longitude": 105.95064
+        },
+        {
+          "latitude": 20.99342,
+          "longitude": 105.95077
+        },
+        {
+          "latitude": 20.99334,
+          "longitude": 105.95088000000001
+        },
+        {
+          "latitude": 20.99318,
+          "longitude": 105.95075000000001
+        },
+        {
+          "latitude": 20.99326,
+          "longitude": 105.95064
+        }
+      ]
+    },
+    {
+      "code": "NT01-20",
+      "type": "biet-thu-don-lap",
+      "area_m2": 339.0,
+      "coordinates": [
+        {
+          "latitude": 20.993479999999998,
+          "longitude": 105.95082000000001
+        },
+        {
+          "latitude": 20.99364,
+          "longitude": 105.95095
+        },
+        {
+          "latitude": 20.99356,
+          "longitude": 105.95106000000001
+        },
+        {
+          "latitude": 20.993399999999998,
+          "longitude": 105.95093000000001
+        },
+        {
+          "latitude": 20.993479999999998,
+          "longitude": 105.95082000000001
+        }
+      ]
+    },
+    {
+      "code": "NT01-22",
+      "type": "biet-thu-don-lap",
+      "area_m2": 306.0,
+      "coordinates": [
+        {
+          "latitude": 20.993699999999997,
+          "longitude": 105.95100000000001
+        },
+        {
+          "latitude": 20.993859999999998,
+          "longitude": 105.95113
+        },
+        {
+          "latitude": 20.993779999999997,
+          "longitude": 105.95124000000001
+        },
+        {
+          "latitude": 20.993619999999996,
+          "longitude": 105.95111000000001
+        },
+        {
+          "latitude": 20.993699999999997,
+          "longitude": 105.95100000000001
+        }
+      ]
+    },
+    {
+      "code": "NT01-24",
+      "type": "biet-thu-don-lap",
+      "area_m2": 306.0,
+      "coordinates": [
+        {
+          "latitude": 20.99392,
+          "longitude": 105.95118000000001
+        },
+        {
+          "latitude": 20.99408,
+          "longitude": 105.95131
+        },
+        {
+          "latitude": 20.994,
+          "longitude": 105.95142000000001
+        },
+        {
+          "latitude": 20.99384,
+          "longitude": 105.95129000000001
+        },
+        {
+          "latitude": 20.99392,
+          "longitude": 105.95118000000001
+        }
+      ]
+    },
+    {
+      "code": "NT02-01",
+      "type": "biet-thu-song-lap",
+      "area_m2": 183.6,
+      "coordinates": [
+        {
+          "latitude": 20.9913,
+          "longitude": 105.94904000000001
+        },
+        {
+          "latitude": 20.991439999999997,
+          "longitude": 105.94915000000002
+        },
+        {
+          "latitude": 20.991369999999996,
+          "longitude": 105.94924000000002
+        },
+        {
+          "latitude": 20.991229999999998,
+          "longitude": 105.94913000000001
+        },
+        {
+          "latitude": 20.9913,
+          "longitude": 105.94904000000001
+        }
+      ]
+    },
+    {
+      "code": "NT02-03",
+      "type": "biet-thu-song-lap",
+      "area_m2": 183.6,
+      "coordinates": [
+        {
+          "latitude": 20.991519999999998,
+          "longitude": 105.94922000000001
+        },
+        {
+          "latitude": 20.991659999999996,
+          "longitude": 105.94933000000002
+        },
+        {
+          "latitude": 20.991589999999995,
+          "longitude": 105.94942000000002
+        },
+        {
+          "latitude": 20.991449999999997,
+          "longitude": 105.94931000000001
+        },
+        {
+          "latitude": 20.991519999999998,
+          "longitude": 105.94922000000001
+        }
+      ]
+    },
+    {
+      "code": "NT02-05",
+      "type": "biet-thu-song-lap",
+      "area_m2": 183.6,
+      "coordinates": [
+        {
+          "latitude": 20.99174,
+          "longitude": 105.94940000000001
+        },
+        {
+          "latitude": 20.99188,
+          "longitude": 105.94951000000002
+        },
+        {
+          "latitude": 20.991809999999997,
+          "longitude": 105.94960000000002
+        },
+        {
+          "latitude": 20.99167,
+          "longitude": 105.94949000000001
+        },
+        {
+          "latitude": 20.99174,
+          "longitude": 105.94940000000001
+        }
+      ]
+    },
+    {
+      "code": "NT02-07",
+      "type": "biet-thu-song-lap",
+      "area_m2": 183.6,
+      "coordinates": [
+        {
+          "latitude": 20.99196,
+          "longitude": 105.94958000000001
+        },
+        {
+          "latitude": 20.992099999999997,
+          "longitude": 105.94969000000002
+        },
+        {
+          "latitude": 20.992029999999996,
+          "longitude": 105.94978000000002
+        },
+        {
+          "latitude": 20.991889999999998,
+          "longitude": 105.94967000000001
+        },
+        {
+          "latitude": 20.99196,
+          "longitude": 105.94958000000001
+        }
+      ]
+    },
+    {
+      "code": "NT02-09",
+      "type": "biet-thu-song-lap",
+      "area_m2": 183.6,
+      "coordinates": [
+        {
+          "latitude": 20.992179999999998,
+          "longitude": 105.94976000000001
+        },
+        {
+          "latitude": 20.992319999999996,
+          "longitude": 105.94987000000002
+        },
+        {
+          "latitude": 20.992249999999995,
+          "longitude": 105.94996000000002
+        },
+        {
+          "latitude": 20.992109999999997,
+          "longitude": 105.94985000000001
+        },
+        {
+          "latitude": 20.992179999999998,
+          "longitude": 105.94976000000001
+        }
+      ]
+    },
+    {
+      "code": "NT02-11",
+      "type": "biet-thu-song-lap",
+      "area_m2": 183.6,
+      "coordinates": [
+        {
+          "latitude": 20.9924,
+          "longitude": 105.94994000000001
+        },
+        {
+          "latitude": 20.992539999999998,
+          "longitude": 105.95005000000002
+        },
+        {
+          "latitude": 20.992469999999997,
+          "longitude": 105.95014000000002
+        },
+        {
+          "latitude": 20.99233,
+          "longitude": 105.95003000000001
+        },
+        {
+          "latitude": 20.9924,
+          "longitude": 105.94994000000001
+        }
+      ]
+    },
+    {
+      "code": "NT02-13",
+      "type": "biet-thu-song-lap",
+      "area_m2": 183.6,
+      "coordinates": [
+        {
+          "latitude": 20.99262,
+          "longitude": 105.95012000000001
+        },
+        {
+          "latitude": 20.992759999999997,
+          "longitude": 105.95023000000002
+        },
+        {
+          "latitude": 20.992689999999996,
+          "longitude": 105.95032000000002
+        },
+        {
+          "latitude": 20.992549999999998,
+          "longitude": 105.95021000000001
+        },
+        {
+          "latitude": 20.99262,
+          "longitude": 105.95012000000001
+        }
+      ]
+    },
+    {
+      "code": "NT02-15",
+      "type": "biet-thu-song-lap",
+      "area_m2": 183.6,
+      "coordinates": [
+        {
+          "latitude": 20.992839999999998,
+          "longitude": 105.95030000000001
+        },
+        {
+          "latitude": 20.992979999999996,
+          "longitude": 105.95041000000002
+        },
+        {
+          "latitude": 20.992909999999995,
+          "longitude": 105.95050000000002
+        },
+        {
+          "latitude": 20.992769999999997,
+          "longitude": 105.95039000000001
+        },
+        {
+          "latitude": 20.992839999999998,
+          "longitude": 105.95030000000001
+        }
+      ]
+    },
+    {
+      "code": "NT02-17",
+      "type": "biet-thu-song-lap",
+      "area_m2": 183.6,
+      "coordinates": [
+        {
+          "latitude": 20.99306,
+          "longitude": 105.95048000000001
+        },
+        {
+          "latitude": 20.993199999999998,
+          "longitude": 105.95059000000002
+        },
+        {
+          "latitude": 20.993129999999997,
+          "longitude": 105.95068000000002
+        },
+        {
+          "latitude": 20.99299,
+          "longitude": 105.95057000000001
+        },
+        {
+          "latitude": 20.99306,
+          "longitude": 105.95048000000001
+        }
+      ]
+    },
+    {
+      "code": "NT02-19",
+      "type": "biet-thu-song-lap",
+      "area_m2": 183.6,
+      "coordinates": [
+        {
+          "latitude": 20.99328,
+          "longitude": 105.95066000000001
+        },
+        {
+          "latitude": 20.993419999999997,
+          "longitude": 105.95077000000002
+        },
+        {
+          "latitude": 20.993349999999996,
+          "longitude": 105.95086000000002
+        },
+        {
+          "latitude": 20.993209999999998,
+          "longitude": 105.95075000000001
+        },
+        {
+          "latitude": 20.99328,
+          "longitude": 105.95066000000001
+        }
+      ]
+    }
+  ],
+  "buildings": [
+    {
+      "code": "M1-Masteri",
+      "label": "Tòa M1 Masteri Waterfront",
+      "coordinates": [
+        {
+          "latitude": 20.9942,
+          "longitude": 105.9442
+        },
+        {
+          "latitude": 20.9948,
+          "longitude": 105.9442
+        },
+        {
+          "latitude": 20.9948,
+          "longitude": 105.9446
+        },
+        {
+          "latitude": 20.9945,
+          "longitude": 105.9446
+        },
+        {
+          "latitude": 20.9945,
+          "longitude": 105.9452
+        },
+        {
+          "latitude": 20.9942,
+          "longitude": 105.9452
+        },
+        {
+          "latitude": 20.9942,
+          "longitude": 105.9442
+        }
+      ]
+    },
+    {
+      "code": "M2-Masteri",
+      "label": "Tòa M2 Masteri Waterfront",
+      "coordinates": [
+        {
+          "latitude": 20.9934,
+          "longitude": 105.9445
+        },
+        {
+          "latitude": 20.994,
+          "longitude": 105.9445
+        },
+        {
+          "latitude": 20.994,
+          "longitude": 105.9453
+        },
+        {
+          "latitude": 20.9934,
+          "longitude": 105.9453
+        },
+        {
+          "latitude": 20.9934,
+          "longitude": 105.945
+        },
+        {
+          "latitude": 20.9937,
+          "longitude": 105.945
+        },
+        {
+          "latitude": 20.9937,
+          "longitude": 105.9448
+        },
+        {
+          "latitude": 20.9934,
+          "longitude": 105.9448
+        },
+        {
+          "latitude": 20.9934,
+          "longitude": 105.9445
+        }
+      ]
+    },
+    {
+      "code": "S2.05",
+      "label": "Tòa S2.05 The Sapphire 2",
+      "coordinates": [
+        {
+          "latitude": 20.9925,
+          "longitude": 105.9422
+        },
+        {
+          "latitude": 20.993,
+          "longitude": 105.9422
+        },
+        {
+          "latitude": 20.993,
+          "longitude": 105.9427
+        },
+        {
+          "latitude": 20.9928,
+          "longitude": 105.9427
+        },
+        {
+          "latitude": 20.9928,
+          "longitude": 105.9432
+        },
+        {
+          "latitude": 20.9923,
+          "longitude": 105.9432
+        },
+        {
+          "latitude": 20.9923,
+          "longitude": 105.9427
+        },
+        {
+          "latitude": 20.9925,
+          "longitude": 105.9427
+        },
+        {
+          "latitude": 20.9925,
+          "longitude": 105.9422
+        }
+      ]
+    }
+  ]
+}
