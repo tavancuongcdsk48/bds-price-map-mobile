@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -26,14 +26,6 @@ const STATUS: Record<string, { label: string; color: string; bg: string }> = {
   hidden: { label: 'Đã gỡ', color: '#f87171', bg: 'rgba(239,68,68,0.14)' },
 };
 
-const FILTERS: { key: string; label: string }[] = [
-  { key: 'all', label: 'Tất cả' },
-  { key: 'active', label: 'Đang bán' },
-  { key: 'pending', label: 'Giao dịch' },
-  { key: 'sold', label: 'Đã bán' },
-  { key: 'hidden', label: 'Đã gỡ' },
-];
-
 interface Props {
   visible: boolean;
   pins: MyPin[];
@@ -57,11 +49,7 @@ export const MyPinsModal: React.FC<Props> = ({
   onDelete,
   onChangeStatus,
 }) => {
-  const [filter, setFilter] = useState('all');
-
-  const list = filter === 'all' ? pins : pins.filter((p) => (p.status || 'active') === filter);
-  const countOf = (k: string) =>
-    k === 'all' ? pins.length : pins.filter((p) => (p.status || 'active') === k).length;
+  const list = pins;
 
   const askStatus = (pin: MyPin) => {
     Alert.alert(
@@ -89,27 +77,6 @@ export const MyPinsModal: React.FC<Props> = ({
               <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
           </View>
-
-          <FlatList
-            horizontal
-            data={FILTERS}
-            keyExtractor={(f) => f.key}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterRow}
-            renderItem={({ item }) => {
-              const active = filter === item.key;
-              return (
-                <TouchableOpacity
-                  style={[styles.chip, active && styles.chipActive]}
-                  onPress={() => setFilter(item.key)}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                    {item.label} {countOf(item.key) > 0 ? `(${countOf(item.key)})` : ''}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }}
-          />
 
           {loading && pins.length === 0 ? (
             <ActivityIndicator color="#22c55e" style={{ marginTop: 40 }} />

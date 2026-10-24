@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -11,6 +11,7 @@ import {
   Image
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { reverseGeocode } from '../services/reverseGeocode';
 
 interface CreatePinModalProps {
   visible: boolean;
@@ -50,6 +51,39 @@ export const CreatePinModal: React.FC<CreatePinModalProps> = ({
   const [address, setAddress] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [videoUri, setVideoUri] = useState<string | null>(null);
+  const [addrLoading, setAddrLoading] = useState(false);
+  const [addrAuto, setAddrAuto] = useState(false);
+  const lastAutoAddr = React.useRef('');
+
+  // Tự bắt địa chỉ từ toạ độ đã chọn (OSM: có tên toà nhà/khu đô thị nếu dữ liệu có)
+  useEffect(() => {
+    if (!visible) return;
+    const coords = pickedCoords || currentCoords;
+    if (!coords) return;
+    // Chỉ tự điền khi ô địa chỉ trống, hoặc đang chứa địa chỉ do máy tự điền trước đó
+    const current = address.trim();
+    if (current.length > 0 && current !== lastAutoAddr.current) return;
+
+    let cancelled = false;
+    setAddrLoading(true);
+    reverseGeocode(coords.latitude, coords.longitude)
+      .then((r) => {
+        if (cancelled) return;
+        if (r.full) {
+          lastAutoAddr.current = r.full;
+          setAddress(r.full);
+          setAddrAuto(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAddrLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, pickedCoords?.latitude, pickedCoords?.longitude, currentCoords?.latitude, currentCoords?.longitude]);
 
   // Chọn ảnh từ máy (Tối đa 6 ảnh)
   const pickImages = async () => {
@@ -131,6 +165,8 @@ export const CreatePinModal: React.FC<CreatePinModalProps> = ({
     setArea('');
     setPhone('');
     setAddress('');
+    lastAutoAddr.current = '';
+    setAddrAuto(false);
     setImages([]);
     setVideoUri(null);
     onClose();
@@ -225,14 +261,26 @@ export const CreatePinModal: React.FC<CreatePinModalProps> = ({
               onChangeText={setPhone}
             />
 
-            <Text style={styles.label}>Địa chỉ đường phố (tuỳ chọn)</Text>
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Địa chỉ / toà nhà</Text>
+              {addrLoading ? <Text style={styles.addrHint}>Đang bắt địa chỉ…</Text> : null}
+              {!addrLoading && addrAuto ? (
+                <Text style={styles.addrHint}>tự điền từ toạ độ</Text>
+              ) : null}
+            </View>
             <TextInput
               style={styles.input}
-              placeholder="VD: Ngõ 68 Quan Hoa, Cầu Giấy"
+              placeholder={addrLoading ? 'Đang lấy địa chỉ từ toạ độ…' : 'VD: Toà S2.18 Vinhomes Ocean Park'}
               placeholderTextColor="#64748b"
               value={address}
-              onChangeText={setAddress}
+              onChangeText={(t) => {
+                setAddress(t);
+                setAddrAuto(false);
+              }}
             />
+            {addrAuto ? (
+              <Text style={styles.addrSource}>Địa chỉ © OpenStreetMap</Text>
+            ) : null}
 
             {/* Vị trí ghim: GPS hoặc tự đặt trên bản đồ */}
             <Text style={styles.label}>Vị trí ghim trên bản đồ</Text>
@@ -345,6 +393,9 @@ const styles = StyleSheet.create({
   formScroll: {
     marginBottom: 20,
   },
+  labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  addrHint: { color: '#38bdf8', fontSize: 10.5, fontWeight: '600' },
+  addrSource: { color: '#475569', fontSize: 9.5, marginTop: 4 },
   label: {
     color: '#cbd5e1',
     fontSize: 13,

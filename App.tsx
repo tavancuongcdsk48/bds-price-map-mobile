@@ -28,6 +28,7 @@ import { AuthModal } from './src/components/AuthModal';
 import { SavedPinsModal } from './src/components/SavedPinsModal';
 import { MediaStrip, MediaViewer } from './src/components/PinMedia';
 import { MyPinsModal } from './src/components/MyPinsModal';
+import { openDirections, distanceKm, formatDistance } from './src/services/directions';
 import {
   fetchPinsInBounds,
   searchPinsByText,
@@ -403,6 +404,16 @@ export default function App() {
   // ---------- Lịch sử giá ----------
   const loadPriceHistory = (pinId: string) => {
     fetchPriceHistory(pinId).then(setPriceHistory).catch(() => setPriceHistory([]));
+  };
+
+  // Bánh răng: menu quản lý ghim của chính mình
+  const openPinMenu = () => {
+    if (!selectedPin) return;
+    Alert.alert(selectedPin.title, 'Quản lý ghim của bạn', [
+      { text: 'Sửa giá', onPress: openPriceEditor },
+      { text: 'Xoá ghim', style: 'destructive', onPress: handleDeletePin },
+      { text: 'Huỷ', style: 'cancel' },
+    ]);
   };
 
   const openPriceEditor = () => {
@@ -909,6 +920,30 @@ export default function App() {
               {selectedPin.owner_name || 'Người dùng'}
             </Text>
             {selectedPin.is_mine ? <Text style={styles.ownerYou}>· Bạn</Text> : null}
+
+            <View style={styles.ownerIcons}>
+              {/* Trái tim: xám → đỏ khi lưu */}
+              <TouchableOpacity
+                style={styles.iconAction}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={() => handleToggleSave(selectedPin)}
+              >
+                <Text style={[styles.heartIcon, selectedPin.is_saved && styles.heartIconActive]}>
+                  {selectedPin.is_saved ? '♥' : '♡'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Bánh răng: chỉ chủ ghim, mở menu sửa/xoá */}
+              {selectedPin.is_mine ? (
+                <TouchableOpacity
+                  style={styles.iconAction}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  onPress={openPinMenu}
+                >
+                  <Text style={styles.gearIcon}>⚙</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
           </View>
 
           {/* Ba ô lớn: Giá chủ nhà rao · Đơn giá/m² · Diện tích */}
@@ -933,7 +968,19 @@ export default function App() {
             </View>
           </View>
 
-          <Text style={styles.addressText}>📍 {selectedPin.address_text}</Text>
+          <Text style={styles.addressText}>
+            📍 {selectedPin.address_text}
+            {location
+              ? `  ·  ${formatDistance(
+                  distanceKm(
+                    location.latitude,
+                    location.longitude,
+                    selectedPin.latitude,
+                    selectedPin.longitude
+                  )
+                )} từ bạn`
+              : ''}
+          </Text>
 
           {/* Ảnh / video thực tế: thumbnail, bấm để xem full */}
           {pinMedia.length > 0 && (
@@ -990,35 +1037,6 @@ export default function App() {
             </View>
           )}
 
-          {/* Sửa / Xoá / Lưu ghim trên cùng một dòng */}
-          <View style={styles.btnRow}>
-            {selectedPin.is_mine ? (
-              <>
-                <TouchableOpacity style={[styles.actionBtn, styles.btnNeutral]} onPress={openPriceEditor}>
-                  <Text style={styles.btnSmallText} numberOfLines={1} adjustsFontSizeToFit>
-                    ✏️ Sửa
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.actionBtn, styles.btnDanger]} onPress={handleDeletePin}>
-                  <Text style={styles.btnDangerText} numberOfLines={1} adjustsFontSizeToFit>
-                    🗑 Xoá
-                  </Text>
-                </TouchableOpacity>
-              </>
-            ) : null}
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.btnSave, selectedPin.is_saved && styles.btnSaveActive]}
-              onPress={() => handleToggleSave(selectedPin)}
-            >
-              <Text
-                style={[styles.btnSaveText, selectedPin.is_saved && styles.btnSaveTextActive]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-              >
-                {selectedPin.is_saved ? '💚 Đã lưu' : '🤍 Lưu ghim'}
-              </Text>
-            </TouchableOpacity>
-          </View>
 
           {/* Liên hệ chủ nhà */}
           <View style={styles.btnRow}>
@@ -1035,6 +1053,14 @@ export default function App() {
               <Text style={styles.btnZaloText}>💬  Nhắn Zalo</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Chỉ đường bằng app bản đồ có sẵn trên máy */}
+          <TouchableOpacity
+            style={styles.directionsBtn}
+            onPress={() => openDirections(selectedPin.latitude, selectedPin.longitude, selectedPin.title)}
+          >
+            <Text style={styles.directionsText}>🧭  Chỉ đường tới ghim</Text>
+          </TouchableOpacity>
           </ScrollView>
         </View>
       )}
@@ -1429,6 +1455,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   ownerRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+  ownerIcons: { flexDirection: 'row', alignItems: 'center', gap: 10, marginLeft: 'auto' },
+  iconAction: { padding: 2 },
+  heartIcon: { fontSize: 20, color: '#94a3b8' },
+  heartIconActive: { color: '#ef4444' },
+  gearIcon: { fontSize: 17, color: '#94a3b8' },
   ownerName: { color: '#94a3b8', fontSize: 12.5, fontWeight: '600', flexShrink: 1 },
   ownerYou: { color: '#4ade80', fontSize: 12, fontWeight: '700' },
   verifiedCheck: {
@@ -1471,6 +1502,17 @@ const styles = StyleSheet.create({
   btnDangerText: { color: '#f87171', fontSize: 13, fontWeight: '700' },
   btnCall: { backgroundColor: '#22c55e' },
   btnCallText: { color: '#052e16', fontSize: 13, fontWeight: '800' },
+  directionsBtn: {
+    marginTop: 8,
+    minHeight: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(56,189,248,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(56,189,248,0.5)',
+  },
+  directionsText: { color: '#38bdf8', fontSize: 13, fontWeight: '800' },
   btnZalo: { backgroundColor: '#2563eb' },
   btnZaloText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
 
