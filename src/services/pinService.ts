@@ -19,6 +19,31 @@ export interface PinItem {
   is_verified: boolean;
   /** true = chính thiết bị/tài khoản này đã ghim → được sửa giá */
   is_mine: boolean;
+  /** true = người dùng đang đăng nhập đã lưu ghim này để theo dõi */
+  is_saved?: boolean;
+}
+
+/** Một ghim người dùng đã lưu, kèm biến động giá so với lúc lưu */
+export interface SavedPin {
+  pin_id: string;
+  title: string;
+  property_type: string;
+  price_vnd: number;
+  saved_price_vnd: number;
+  change_vnd: number;
+  change_percent: number;
+  area_m2: number;
+  price_per_m2: number;
+  latitude: number;
+  longitude: number;
+  address_text: string;
+  contact_phone: string;
+  pin_status: 'active' | 'pending' | 'sold' | 'hidden';
+  price_changes: number;
+  last_change_at: string | null;
+  saved_at: string;
+  note: string | null;
+  saves_count: number;
 }
 
 // 1. Lấy danh sách ghim trong khung nhìn (Viewport Bounding Box)
@@ -40,6 +65,7 @@ function formatPin(item: any): PinItem {
     address_text: item.address_text,
     is_verified: true,
     is_mine: Boolean(item.is_mine),
+    is_saved: Boolean(item.is_saved),
   };
 }
 
@@ -229,8 +255,78 @@ export async function fetchPriceHistory(pinId: string): Promise<PriceHistoryPoin
       source: r.source,
       created_at: r.created_at,
     }));
+
   } catch (err) {
     console.warn('Lỗi lịch sử giá:', err);
     return [];
+  }
+}
+
+// 6. Lưu / bỏ lưu một ghim để theo dõi biến động giá
+export async function toggleSavePin(
+  pinId: string
+): Promise<{ saved: boolean; savesCount: number; error?: string }> {
+  try {
+    const { data, error } = await supabase.rpc('toggle_save_pin', { p_pin_id: pinId });
+    if (error) {
+      const msg = error.message || '';
+      if (msg.includes('not_authenticated')) return { saved: false, savesCount: 0, error: 'not_authenticated' };
+      if (msg.includes('pin_not_found')) return { saved: false, savesCount: 0, error: 'pin_not_found' };
+      return { saved: false, savesCount: 0, error: msg };
+    }
+    const payload = (data || {}) as { saved?: boolean; saves_count?: number };
+    return { saved: Boolean(payload.saved), savesCount: Number(payload.saves_count || 0) };
+  } catch (err: any) {
+    return { saved: false, savesCount: 0, error: String(err?.message || err) };
+  }
+}
+
+// 7. Danh sách ghim tôi đã lưu, kèm giá lúc lưu và % biến động hiện tại
+export async function fetchSavedPins(): Promise<SavedPin[] | null> {
+  try {
+    const { data, error } = await supabase.rpc('get_my_saved_pins');
+    if (error) {
+      console.warn('Lỗi lấy ghim đã lưu:', error.message);
+      return error.message.includes('not_authenticated') ? [] : null;
+    }
+    return ((data as any[]) || []).map((r) => ({
+      pin_id: r.pin_id,
+      title: r.title,
+      property_type: r.property_type,
+      price_vnd: Number(r.price_vnd),
+      saved_price_vnd: Number(r.saved_price_vnd),
+      change_vnd: Number(r.change_vnd),
+      change_percent: Number(r.change_percent || 0),
+      area_m2: Number(r.area_m2),
+      price_per_m2: Number(r.price_per_m2),
+      latitude: Number(r.latitude),
+      longitude: Number(r.longitude),
+      address_text: r.address_text,
+      contact_phone: r.contact_phone,
+      pin_status: r.pin_status,
+      price_changes: Number(r.price_changes || 0),
+      last_change_at: r.last_change_at,
+      saved_at: r.saved_at,
+      note: r.note,
+      saves_count: Number(r.saves_count || 0),
+    }));
+  } catch (err) {
+    console.warn('Lỗi ghim đã lưu:', err);
+    return null;
+  }
+}
+
+// 8. Ghi chú riêng cho ghim đã lưu
+export async function setSaveNote(pinId: string, note: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc('set_save_note', { p_pin_id: pinId, p_note: note });
+    if (error) {
+      console.warn('Lỗi lưu ghi chú:', error.message);
+      return false;
+    }
+    return Boolean(data);
+  } catch (err) {
+    console.warn('Lỗi ghi chú:', err);
+    return false;
   }
 }

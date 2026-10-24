@@ -18,6 +18,7 @@ import * as Location from 'expo-location';
 import { useGoogleAuth } from './src/hooks/useGoogleAuth';
 import { CreatePinModal, NewPinData } from './src/components/CreatePinModal';
 import { AuthModal } from './src/components/AuthModal';
+import { SavedPinsModal } from './src/components/SavedPinsModal';
 import {
   fetchPinsInBounds,
   searchPinsByText,
@@ -26,6 +27,9 @@ import {
   fetchPriceHistory,
   claimDemoPins,
   deletePin,
+  toggleSavePin,
+  fetchSavedPins,
+  SavedPin,
   PinItem,
   PriceHistoryPoint
 } from './src/services/pinService';
@@ -136,6 +140,9 @@ export default function App() {
   const [priceHistory, setPriceHistory] = useState<PriceHistoryPoint[]>([]);
   const [priceEditVisible, setPriceEditVisible] = useState(false);
   const [authModalVisible, setAuthModalVisible] = useState(false);
+  const [savedVisible, setSavedVisible] = useState(false);
+  const [savedItems, setSavedItems] = useState<SavedPin[]>([]);
+  const [savedLoading, setSavedLoading] = useState(false);
   const [priceInput, setPriceInput] = useState('');
   const [pinsList, setPinsList] = useState<PinItem[]>(SEED_PINS);
 
@@ -423,6 +430,92 @@ export default function App() {
     loadPriceHistory(updated.id);
   };
 
+  // ---------- Lưu ghim để theo dõi ----------
+  const savedCount = savedItems.length;
+
+  const loadSavedPins = async () => {
+    if (!isAuthenticated) {
+      setSavedItems([]);
+      return;
+    }
+    setSavedLoading(true);
+    const rows = await fetchSavedPins();
+    if (rows !== null) setSavedItems(rows);
+    setSavedLoading(false);
+  };
+
+  // Nạp lại danh sách lưu mỗi khi đăng nhập / đăng xuất
+  useEffect(() => {
+    loadSavedPins();
+  }, [isAuthenticated, user?.id]);
+
+  const openSavedList = async () => {
+    if (!isAuthenticated) {
+      setAuthModalVisible(true);
+      return;
+    }
+    setSavedVisible(true);
+    await loadSavedPins();
+  };
+
+  const handleToggleSave = async (pin: PinItem) => {
+    if (!isAuthenticated) {
+      setAuthModalVisible(true);
+      return;
+    }
+    const res = await toggleSavePin(pin.id);
+    if (res.error === 'not_authenticated') {
+      setAuthModalVisible(true);
+      return;
+    }
+    if (res.error) {
+      Alert.alert('Chưa lưu được', 'Máy chủ từ chối. Kiểm tra kết nối rồi thử lại.');
+      return;
+    }
+
+    const updated: PinItem = { ...pin, is_saved: res.saved };
+    if (selectedPin?.id === pin.id) setSelectedPin(updated);
+    setPinsList((prev) => prev.map((x) => (x.id === pin.id ? { ...x, is_saved: res.saved } : x)));
+    await loadSavedPins();
+  };
+
+  const handleUnsaveFromList = async (item: SavedPin) => {
+    const res = await toggleSavePin(item.pin_id);
+    if (res.error) {
+      Alert.alert('Chưa bỏ lưu được', 'Máy chủ từ chối. Thử lại sau.');
+      return;
+    }
+    setSavedItems((prev) => prev.filter((x) => x.pin_id !== item.pin_id));
+    setSelectedPin((prev) => (prev && prev.id === item.pin_id ? { ...prev, is_saved: false } : prev));
+    setPinsList((prev) => prev.map((x) => (x.id === item.pin_id ? { ...x, is_saved: false } : x)));
+  };
+
+  const handleOpenSavedPin = (item: SavedPin) => {
+    setSavedVisible(false);
+    const asPin: PinItem = {
+      id: item.pin_id,
+      title: item.title,
+      price_vnd: item.price_vnd,
+      price_display: (item.price_vnd / 1000000000).toFixed(1) + ' Tỷ',
+      price_per_m2_display: Math.round(item.price_per_m2 / 1000000) + ' tr/m²',
+      area_m2: item.area_m2,
+      latitude: item.latitude,
+      longitude: item.longitude,
+      property_type: item.property_type as PinItem['property_type'],
+      has_video: false,
+      contact_phone: item.contact_phone,
+      address_text: item.address_text,
+      is_verified: true,
+      is_mine: false,
+      is_saved: true,
+    };
+    mapRef.current?.animateToRegion(
+      { latitude: item.latitude, longitude: item.longitude, latitudeDelta: 0.008, longitudeDelta: 0.008 },
+      600
+    );
+    setSelectedPin(asPin);
+  };
+
   const handleCallOwner = (phone: string) => {
     Linking.openURL(`tel:${phone}`);
   };
@@ -466,6 +559,15 @@ export default function App() {
             />
             {searching && <ActivityIndicator size="small" color="#22c55e" />}
           </View>
+          <TouchableOpacity style={styles.savedHeaderBtn} onPress={openSavedList}>
+            <Text style={styles.savedHeaderIcon}>❤</Text>
+            {savedCount > 0 && (
+              <View style={styles.savedBadge}>
+                <Text style={styles.savedBadgeText}>{savedCount > 99 ? '99+' : savedCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[styles.avatarButton, isAuthenticated && styles.avatarButtonActive]}
             onPress={() => {
@@ -717,6 +819,16 @@ export default function App() {
             </View>
           )}
 
+          {/* Lưu ghim để theo dõi biến động giá */}
+          <TouchableOpacity
+            style={[styles.saveBtn, selectedPin.is_saved && styles.saveBtnActive]}
+            onPress={() => handleToggleSave(selectedPin)}
+          >
+            <Text style={[styles.saveBtnText, selectedPin.is_saved && styles.saveBtnTextActive]}>
+              {selectedPin.is_saved ? '💚 Đã lưu — đang theo dõi giá' : '🤍 Lưu ghim để theo dõi giá'}
+            </Text>
+          </TouchableOpacity>
+
           {/* Chủ ghim được sửa giá */}
           {selectedPin.is_mine ? (
             <View style={styles.ownerActions}>
@@ -760,6 +872,17 @@ export default function App() {
           </View>
         </View>
       )}
+
+      {/* Danh sách ghim đã lưu + biến động giá */}
+      <SavedPinsModal
+        visible={savedVisible}
+        items={savedItems}
+        loading={savedLoading}
+        onClose={() => setSavedVisible(false)}
+        onRefresh={loadSavedPins}
+        onOpenPin={handleOpenSavedPin}
+        onUnsave={handleUnsaveFromList}
+      />
 
       {/* Đăng nhập tài khoản: Google hoặc email/mật khẩu */}
       <AuthModal
@@ -1100,6 +1223,45 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  savedHeaderBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(15,23,42,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  savedHeaderIcon: { color: '#ef4444', fontSize: 17 },
+  savedBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: '#ef4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  savedBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+
+  saveBtn: {
+    marginTop: 12,
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  saveBtnActive: { backgroundColor: 'rgba(34,197,94,0.14)', borderColor: '#22c55e' },
+  saveBtnText: { color: '#e2e8f0', fontSize: 13, fontWeight: '700' },
+  saveBtnTextActive: { color: '#4ade80' },
+
   avatarButton: {
     width: 44,
     height: 44,
