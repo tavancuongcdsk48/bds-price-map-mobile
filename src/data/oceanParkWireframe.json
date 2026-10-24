@@ -6,31 +6,31 @@
     "code": "NT06-10",
     "area_m2": 153.0,
     "street": "Đường Ngọc Trai 6",
-    "rotation": 35,
+    "rotation": 12,
     "center": {
-      "latitude": 20.9949655,
-      "longitude": 105.9482814
+      "latitude": 20.9952885,
+      "longitude": 105.9478786
     },
     "coordinates": [
       {
-        "latitude": 20.995,
-        "longitude": 105.9482
+        "latitude": 20.99535,
+        "longitude": 105.94785
       },
       {
-        "latitude": 20.995049,
-        "longitude": 105.9482747
+        "latitude": 20.9953678,
+        "longitude": 105.9479392
       },
       {
-        "latitude": 20.9949311,
-        "longitude": 105.9483628
+        "latitude": 20.9952269,
+        "longitude": 105.9479073
       },
       {
-        "latitude": 20.994882,
-        "longitude": 105.9482881
+        "latitude": 20.9952091,
+        "longitude": 105.9478181
       },
       {
-        "latitude": 20.995,
-        "longitude": 105.9482
+        "latitude": 20.99535,
+        "longitude": 105.94785
       }
     ]
   }

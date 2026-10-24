@@ -830,10 +830,10 @@ export default function App() {
 
   const initialRegion: Region = {
     // Zoom chính xác vào Đường Ngọc Trai 6 (Ocean Park 1)
-    latitude: 20.99505,
-    longitude: 105.94825,
-    latitudeDelta: 0.0030,
-    longitudeDelta: 0.0030,
+    latitude: 20.99530,
+    longitude: 105.94790,
+    latitudeDelta: 0.0015,
+    longitudeDelta: 0.0015,
   };
 
   return (
@@ -990,13 +990,8 @@ export default function App() {
         >
           {Platform.OS === 'android' && (
             <UrlTile
-              key={mapDelta < 0.008 ? 'img' : 'dark'}
-              urlTemplate={
-                mapDelta < 0.008
-                  // zoom sát: nền tối Esri chỉ có tới z16 nên phải dùng ảnh vệ tinh (z19)
-                  ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-                  : 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
-              }
+              key="carto-dark"
+              urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
               maximumZ={19}
               flipY={false}
             />
