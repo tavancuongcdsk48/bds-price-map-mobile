@@ -26,6 +26,7 @@ import * as Location from 'expo-location';
 import { useGoogleAuth } from './src/hooks/useGoogleAuth';
 import { CreatePinModal, NewPinData } from './src/components/CreatePinModal';
 import { PriceAnalysisSheet } from './src/components/PriceAnalysisSheet';
+import { ShareSheet } from './src/components/ShareSheet';
 import { AuthModal } from './src/components/AuthModal';
 import { SavedPinsModal } from './src/components/SavedPinsModal';
 import { MediaStrip, MediaViewer } from './src/components/PinMedia';
@@ -173,6 +174,8 @@ export default function App() {
   // Sheet "Phân tích giá" (2 tab: căn này / khu vực) — mở từ thẻ ghim hoặc từ nút 📊 trên bản đồ
   const [analysisVisible, setAnalysisVisible] = useState(false);
   const [analysisTab, setAnalysisTab] = useState<'pin' | 'area'>('pin');
+  const [shareVisible, setShareVisible] = useState(false);
+  const [sharePayload, setSharePayload] = useState<{ url: string; message: string }>({ url: '', message: '' });
   const [mapAreaHistory, setMapAreaHistory] = useState<AreaPricePoint[]>([]);
   const [mapAreaCenter, setMapAreaCenter] = useState<{ latitude: number; longitude: number } | null>(null);
   const [mapAreaLabel, setMapAreaLabel] = useState<string | null>(null);
@@ -806,16 +809,8 @@ export default function App() {
       `📍 ${pin.address_text || ''}\n` +
       `Xem chi tiết: ${deepLink}\n` +
       `Tải app Vũ Trụ Chuyển Nhượng để xem bản đồ giá BĐS.`;
-    try {
-      await Share.share({
-        title: 'Chia sẻ ghim',
-        message: msg,
-        url: deepLink,
-      });
-    } catch (e) {
-      // người dùng huỷ hoặc không có app share
-      Alert.alert('Không mở được chia sẻ', msg, [{ text: 'OK' }]);
-    }
+    setSharePayload({ url: deepLink, message: msg });
+    setShareVisible(true);
   };
 
   const filteredPins = pinsList.filter(p => {
@@ -1304,6 +1299,14 @@ export default function App() {
           </View>
         </View>
       )}
+
+      {/* Chọn nền tảng chia sẻ: Zalo / Facebook / Telegram / Messenger / SMS / Copy */}
+      <ShareSheet
+        visible={shareVisible}
+        onClose={() => setShareVisible(false)}
+        url={sharePayload.url}
+        message={sharePayload.message}
+      />
 
       {/* Sheet Phân tích giá: 2 tab (căn này / khu vực) */}
       <PriceAnalysisSheet
