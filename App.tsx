@@ -1102,6 +1102,15 @@ export default function App() {
             {selectedPin.is_mine ? <Text style={styles.ownerYou}>· Bạn</Text> : null}
 
             <View style={styles.ownerIcons}>
+              {/* Chia sẻ: mở share sheet hệ thống (Zalo/FB/Telegram…) */}
+              <TouchableOpacity
+                style={styles.iconAction}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={handleSharePin}
+              >
+                <Text style={styles.shareIcon}>🔗</Text>
+              </TouchableOpacity>
+
               {/* Trái tim: xám → đỏ khi lưu */}
               <TouchableOpacity
                 style={styles.iconAction}
@@ -1196,12 +1205,6 @@ export default function App() {
               onPress={() => handleZaloOwner(selectedPin.contact_phone)}
             >
               <Text style={styles.btnZaloText}>💬  Nhắn Zalo</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.btnShare]}
-              onPress={handleSharePin}
-            >
-              <Text style={styles.btnShareText}>🔗  Chia sẻ ghim</Text>
             </TouchableOpacity>
           </View>
 
@@ -1646,11 +1649,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   ownerRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
-  ownerIcons: { flexDirection: 'row', alignItems: 'center', gap: 10, marginLeft: 'auto' },
-  iconAction: { padding: 2 },
-  heartIcon: { fontSize: 20, color: '#94a3b8' },
+  ownerIcons: { flexDirection: 'row', alignItems: 'center', gap: 14, marginLeft: 'auto' },
+  iconAction: { padding: 4 },
+  heartIcon: { fontSize: 30, color: '#94a3b8' },
   heartIconActive: { color: '#ef4444' },
-  gearIcon: { fontSize: 17, color: '#94a3b8' },
+  gearIcon: { fontSize: 26, color: '#94a3b8' },
+  shareIcon: { fontSize: 28, color: '#94a3b8' },
   ownerName: { color: '#94a3b8', fontSize: 12.5, fontWeight: '600', flexShrink: 1 },
   ownerYou: { color: '#4ade80', fontSize: 12, fontWeight: '700' },
   verifiedCheck: {
@@ -1694,8 +1698,6 @@ const styles = StyleSheet.create({
   btnDangerText: { color: '#f87171', fontSize: 13, fontWeight: '700' },
   btnCall: { backgroundColor: '#22c55e' },
   btnCallText: { color: '#052e16', fontSize: 13, fontWeight: '800' },
-  btnShare: { backgroundColor: '#6366f1' },
-  btnShareText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
   directionsBtn: {
     marginTop: 8,
     minHeight: 44,
