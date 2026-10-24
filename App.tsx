@@ -826,21 +826,11 @@ export default function App() {
           showsCompass={false}
         >
           {Platform.OS === 'android' && (
-            <>
-              {/* Nền bản đồ tối miễn phí (Esri ArcGIS), không cần API key */}
-              <UrlTile
-                urlTemplate="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-                maximumZ={19}
-                flipY={false}
-                tileSize={256}
-              />
-              <UrlTile
-                urlTemplate="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
-                maximumZ={19}
-                flipY={false}
-                tileSize={256}
-              />
-            </>
+            <UrlTile
+              urlTemplate="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+              maximumZ={19}
+              flipY={false}
+            />
           )}
           {filteredPins.map((pin) => (
             <Marker
