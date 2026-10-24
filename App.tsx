@@ -776,25 +776,26 @@ export default function App() {
         <View style={styles.bottomSheet}>
           <View style={styles.sheetGrabber} />
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetScrollContent}>
-          <View style={styles.sheetHeader}>
-            <View style={styles.sheetTitleRow}>
-              <Text style={styles.sheetTitle} numberOfLines={2}>
-                {selectedPin.title}
-              </Text>
-              {selectedPin.is_verified ? (
-                <View style={styles.verifiedCheck}>
-                  <Text style={styles.verifiedCheckText}>✓</Text>
-                </View>
-              ) : null}
-              {selectedPin.is_mine ? (
-                <View style={styles.mineDot}>
-                  <Text style={styles.mineDotText}>👤</Text>
-                </View>
-              ) : null}
-            </View>
+          <View style={styles.sheetTitleRow}>
+            <Text style={styles.sheetTitle} numberOfLines={2}>
+              {selectedPin.title}
+            </Text>
             <TouchableOpacity onPress={() => setSelectedPin(null)} style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Người đăng: tích xanh (nếu có) + tên */}
+          <View style={styles.ownerRow}>
+            {selectedPin.is_verified ? (
+              <View style={styles.verifiedCheck}>
+                <Text style={styles.verifiedCheckText}>✓</Text>
+              </View>
+            ) : null}
+            <Text style={styles.ownerName} numberOfLines={1}>
+              {selectedPin.owner_name || 'Người dùng'}
+            </Text>
+            {selectedPin.is_mine ? <Text style={styles.ownerYou}>· Bạn</Text> : null}
           </View>
 
           {/* Ba ô lớn: Giá chủ nhà rao · Đơn giá/m² · Diện tích */}
@@ -1296,7 +1297,14 @@ const styles = StyleSheet.create({
   ownerBadgeOther: { backgroundColor: 'rgba(148,163,184,0.14)', borderColor: 'rgba(148,163,184,0.4)' },
   ownerBadgeText: { color: '#e2e8f0', fontSize: 10, fontWeight: '700' },
 
-  sheetTitleRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 6 },
+  sheetTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  ownerRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+  ownerName: { color: '#94a3b8', fontSize: 12.5, fontWeight: '600', flexShrink: 1 },
+  ownerYou: { color: '#4ade80', fontSize: 12, fontWeight: '700' },
   verifiedCheck: {
     width: 17,
     height: 17,
@@ -1549,9 +1557,10 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     color: '#f8fafc',
-    fontSize: 16,
-    fontWeight: '700',
-    flexShrink: 1,
+    fontSize: 17,
+    fontWeight: '800',
+    flex: 1,
+    paddingRight: 8,
   },
   badgeVerified: {
     backgroundColor: 'rgba(16, 185, 129, 0.2)',

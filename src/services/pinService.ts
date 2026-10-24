@@ -17,6 +17,7 @@ export interface PinItem {
   contact_phone: string;
   address_text: string;
   is_verified: boolean;
+  owner_name?: string;
   /** true = chính thiết bị/tài khoản này đã ghim → được sửa giá */
   is_mine: boolean;
   /** true = người dùng đang đăng nhập đã lưu ghim này để theo dõi */
@@ -63,7 +64,8 @@ function formatPin(item: any): PinItem {
     video_duration: item.has_video ? '0:45' : undefined,
     contact_phone: item.contact_phone,
     address_text: item.address_text,
-    is_verified: true,
+    is_verified: Boolean(item.owner_verified),
+    owner_name: item.owner_name || 'Người dùng',
     is_mine: Boolean(item.is_mine),
     is_saved: Boolean(item.is_saved),
   };
