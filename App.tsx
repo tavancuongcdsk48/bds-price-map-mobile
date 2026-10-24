@@ -51,8 +51,10 @@ import {
   SavedPin,
   PinItem,
   PriceHistoryPoint,
-  AreaPricePoint
+  AreaPricePoint,
+  fetchAdminAreaPriceHistory
 } from './src/services/pinService';
+import { reverseGeocode } from './src/services/reverseGeocode';
 import { searchPlaces, PlaceResult } from './src/services/placeSearch';
 import { maskPhone } from './src/lib/mediaRules';
 import { snapToBuilding } from './src/services/buildingSnap';
@@ -173,6 +175,7 @@ export default function App() {
   const [analysisTab, setAnalysisTab] = useState<'pin' | 'area'>('pin');
   const [mapAreaHistory, setMapAreaHistory] = useState<AreaPricePoint[]>([]);
   const [mapAreaCenter, setMapAreaCenter] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [mapAreaLabel, setMapAreaLabel] = useState<string | null>(null);
   const [mapAreaLoading, setMapAreaLoading] = useState(false);
   const [priceEditVisible, setPriceEditVisible] = useState(false);
   const [myPinsVisible, setMyPinsVisible] = useState(false);
@@ -409,18 +412,34 @@ export default function App() {
   };
 
   // Phân tích giá khu vực quanh tâm bản đồ (không cần chọn ghim)
+  // Ưu tiên ĐƠN VỊ HÀNH CHÍNH NHỎ NHẤT tại điểm đó (xóm/thôn/ấp → xã/phường → huyện → tỉnh);
+  // chỉ khi chưa có dữ liệu hành chính mới lùi về bán kính 400 m.
   const openAreaAnalysis = async () => {
     const center =
+      (selectedPin ? { latitude: selectedPin.latitude, longitude: selectedPin.longitude } : null) ??
       mapCenterRef.current ??
       (location ? { latitude: location.latitude, longitude: location.longitude } : { latitude: 21.0335, longitude: 105.7942 });
     setMapAreaCenter(center);
     setAnalysisTab('area');
     setAnalysisVisible(true);
-    if (mapAreaHistory.length > 0) return;
     setMapAreaLoading(true);
     try {
-      const rows = await fetchAreaPriceHistory(center.latitude, center.longitude, 400, null, 12);
-      setMapAreaHistory(rows);
+      const rev = await reverseGeocode(center.latitude, center.longitude);
+      const admin = {
+        hamlet: rev.hamlet,
+        ward: rev.ward,
+        district: rev.district,
+        city: rev.city,
+      };
+      const res = await fetchAdminAreaPriceHistory(admin, null, 12);
+      if (res.level !== 'none' && res.points.length > 0) {
+        setMapAreaHistory(res.points);
+        setMapAreaLabel(res.name || null);
+      } else {
+        const rows = await fetchAreaPriceHistory(center.latitude, center.longitude, 400, null, 12);
+        setMapAreaHistory(rows);
+        setMapAreaLabel(rev.hamlet || rev.ward || null);
+      }
     } finally {
       setMapAreaLoading(false);
     }
@@ -483,6 +502,7 @@ export default function App() {
     setSearchResults([]);
     setSearchQuery(row.label);
     const delta = row.kind === 'pin' ? 0.006 : 0.04;
+    mapCenterRef.current = { latitude: row.latitude, longitude: row.longitude };
     mapRef.current?.animateToRegion(
       {
         latitude: row.latitude,
@@ -1291,7 +1311,7 @@ export default function App() {
         pinHistory={priceHistory}
         areaHistory={analysisTab === 'area' && !selectedPin ? mapAreaHistory : areaHistory}
         areaRadiusM={400}
-        areaLabel={mapAreaCenter ? `Quanh ${mapAreaCenter.latitude.toFixed(4)}, ${mapAreaCenter.longitude.toFixed(4)}` : null}
+        areaLabel={analysisTab === 'area' && !selectedPin ? (mapAreaLabel || (mapAreaCenter ? `Quanh ${mapAreaCenter.latitude.toFixed(4)}, ${mapAreaCenter.longitude.toFixed(4)}` : null)) : null}
         loading={mapAreaLoading}
       />
 

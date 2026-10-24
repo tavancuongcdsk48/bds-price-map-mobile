@@ -157,7 +157,9 @@ export const PriceAnalysisSheet: React.FC<PriceAnalysisSheetProps> = ({
               style={[styles.tab, tab === 'area' && styles.tabActive]}
               onPress={() => setTab('area')}
             >
-              <Text style={[styles.tabText, tab === 'area' && styles.tabTextActive]}>Khu vực {areaRadiusM} m</Text>
+              <Text style={[styles.tabText, tab === 'area' && styles.tabTextActive]} numberOfLines={1}>
+                {areaLabel ? areaLabel : `Khu vực ${areaRadiusM} m`}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -206,7 +208,7 @@ export const PriceAnalysisSheet: React.FC<PriceAnalysisSheetProps> = ({
               <View>
                 <View style={styles.summaryRow}>
                   <View>
-                    <Text style={styles.summaryLabel}>Trung vị khu vực</Text>
+                    <Text style={styles.summaryLabel}>{areaLabel ? `Trung vị ${areaLabel}` : 'Trung vị khu vực'}</Text>
                     <Text style={styles.summaryValue}>{formatPpm2(latestArea?.median_ppm2 || 0)}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
@@ -235,7 +237,7 @@ export const PriceAnalysisSheet: React.FC<PriceAnalysisSheetProps> = ({
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyIcon}>🗺️</Text>
                 <Text style={styles.emptyText}>
-                  Chưa đủ dữ liệu để vẽ giá khu vực (cần ít nhất 2 tháng có ghim trong bán kính {areaRadiusM} m).
+                  Chưa đủ dữ liệu để vẽ giá {areaLabel || 'khu vực'} (cần ít nhất 2 tháng có ghim trong cùng đơn vị hành chính).
                 </Text>
               </View>
             )}

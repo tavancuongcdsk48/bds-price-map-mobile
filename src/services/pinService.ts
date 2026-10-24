@@ -142,6 +142,10 @@ export async function createPinInSupabase(
         price_vnd: data.price_vnd,
         area_m2: data.area_m2,
         address_text: data.address_text,
+        admin_hamlet: data.admin_hamlet ?? null,
+        admin_ward: data.admin_ward ?? null,
+        admin_district: data.admin_district ?? null,
+        admin_city: data.admin_city ?? null,
         contact_phone: data.contact_phone,
         contact_zalo: data.contact_phone,
         public_geom: `POINT(${publicLng} ${publicLat})`,
@@ -265,6 +269,58 @@ export interface AreaPricePoint {
   p25: number;
   p75: number;
 }
+
+/** Kết quả bảng giá theo đơn vị hành chính (xóm/thôn → xã/phường → huyện → tỉnh) */
+export interface AdminAreaPrice {
+  level: 'hamlet' | 'ward' | 'district' | 'city' | 'none';
+  name: string;
+  points: AreaPricePoint[];
+}
+
+/**
+ * Bảng giá theo ĐƠN VỊ HÀNH CHÍNH NHỎ NHẤT có dữ liệu tại điểm đang xem.
+ * Thứ tự: xóm/thôn/ấp → xã/phường → quận/huyện → tỉnh/thành.
+ */
+export async function fetchAdminAreaPriceHistory(
+  admin: { hamlet?: string | null; ward?: string | null; district?: string | null; city?: string | null },
+  propertyType?: string | null,
+  months: number = 12
+): Promise<AdminAreaPrice> {
+  try {
+    const { data, error } = await supabase.rpc('get_admin_area_price_history', {
+      p_hamlet: admin.hamlet ?? null,
+      p_ward: admin.ward ?? null,
+      p_district: admin.district ?? null,
+      p_city: admin.city ?? null,
+      p_type: propertyType ?? null,
+      p_months: months,
+    });
+
+    if (error) {
+      console.warn('Lỗi lấy bảng giá theo đơn vị hành chính:', error.message);
+      return { level: 'none', name: '', points: [] };
+    }
+
+    const rows = (data as any[]) || [];
+    if (rows.length === 0) return { level: 'none', name: '', points: [] };
+
+    return {
+      level: (rows[0].area_level || 'none') as AdminAreaPrice['level'],
+      name: rows[0].area_name || '',
+      points: rows.map((r) => ({
+        month: r.month,
+        n_pins: Number(r.n_pins || 0),
+        median_ppm2: Number(r.median_ppm2 || 0),
+        p25: Number(r.p25 || 0),
+        p75: Number(r.p75 || 0),
+      })),
+    };
+  } catch (err) {
+    console.warn('Lỗi bảng giá theo đơn vị hành chính:', err);
+    return { level: 'none', name: '', points: [] };
+  }
+}
+
 
 export async function fetchAreaPriceHistory(
   latitude: number,

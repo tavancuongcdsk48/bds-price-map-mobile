@@ -39,6 +39,11 @@ export interface NewPinData {
   property_type: 'nha-pho' | 'can-ho' | 'dat-nen';
   contact_phone: string;
   address_text: string;
+  /** Đơn vị hành chính nhỏ nhất lấy từ reverse geocode (xóm/thôn → xã/phường → huyện → tỉnh) */
+  admin_hamlet?: string | null;
+  admin_ward?: string | null;
+  admin_district?: string | null;
+  admin_city?: string | null;
   images: string[];
   video_uri?: string;
   video_duration_s?: number;
@@ -61,6 +66,12 @@ export const CreatePinModal: React.FC<CreatePinModalProps> = ({
   const [propertyType, setPropertyType] = useState<'nha-pho' | 'can-ho' | 'dat-nen'>('nha-pho');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [adminArea, setAdminArea] = useState<{
+    hamlet: string | null;
+    ward: string | null;
+    district: string | null;
+    city: string | null;
+  }>({ hamlet: null, ward: null, district: null, city: null });
   const [images, setImages] = useState<string[]>([]);
   const [videoUri, setVideoUri] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState(0);
@@ -88,6 +99,12 @@ export const CreatePinModal: React.FC<CreatePinModalProps> = ({
           setAddress(r.full);
           setAddrAuto(true);
         }
+        setAdminArea({
+          hamlet: r.hamlet,
+          ward: r.ward,
+          district: r.district,
+          city: r.city,
+        });
       })
       .finally(() => {
         if (!cancelled) setAddrLoading(false);
@@ -189,7 +206,7 @@ export const CreatePinModal: React.FC<CreatePinModalProps> = ({
     setVideoDuration(videoDurationSeconds(asset as any));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const priceNum = parseFloat(priceBillion);
     const areaNum = parseFloat(area);
 
@@ -212,13 +229,36 @@ export const CreatePinModal: React.FC<CreatePinModalProps> = ({
 
     const priceVnd = Math.round(priceNum * 1000000000);
 
+    // Địa chỉ + đơn vị hành chính: nếu chưa có (reverse geocode chưa kịp chạy) thì chờ lấy luôn
+    // để ghim không bị rơi về "Ghim theo toạ độ bản đồ".
+    let finalAddress = address.trim();
+    let finalAdmin = adminArea;
+    if (!finalAddress || !finalAdmin.city) {
+      const coords = pickedCoords || currentCoords;
+      if (coords) {
+        try {
+          const r = await reverseGeocode(coords.latitude, coords.longitude);
+          if (!finalAddress && r.full) finalAddress = r.full;
+          if (!finalAdmin.city) {
+            finalAdmin = { hamlet: r.hamlet, ward: r.ward, district: r.district, city: r.city };
+          }
+        } catch {
+          // giữ nguyên, cùng lắm rơi về toạ độ
+        }
+      }
+    }
+
     onSubmit({
       title: title.trim(),
       price_vnd: priceVnd,
       area_m2: areaNum,
       property_type: propertyType,
       contact_phone: phone.trim(),
-      address_text: address.trim() || 'Ghim theo toạ độ bản đồ',
+      address_text: finalAddress || 'Ghim theo toạ độ bản đồ',
+      admin_hamlet: finalAdmin.hamlet,
+      admin_ward: finalAdmin.ward,
+      admin_district: finalAdmin.district,
+      admin_city: finalAdmin.city,
       images: images,
       video_uri: videoUri || undefined,
       video_duration_s: videoUri ? videoDuration || MEDIA_LIMITS.maxVideoSeconds : undefined,
@@ -230,6 +270,7 @@ export const CreatePinModal: React.FC<CreatePinModalProps> = ({
     setArea('');
     setPhone('');
     setAddress('');
+    setAdminArea({ hamlet: null, ward: null, district: null, city: null });
     lastAutoAddr.current = '';
     setAddrAuto(false);
     setImages([]);
