@@ -116,8 +116,8 @@ pin_saves — chỉ chủ sở hữu; profiles — đọc công khai, update ch�
 9. Google sign-in bật thật (OAuth client + tunnel), script owner.
 10. Ownership theo `auth.uid()`, AuthModal (Google + email fallback), xoá ghim.
 11. Tìm kiếm khu vực/dự án/ghim, 4 tab lọc gọn, sửa giá + biểu đồ, đặt ghim bằng tâm ngắm, làm mờ toạ độ.
-12. **Biểu đồ giá gom vào một sheet "Phân tích giá"** (`src/components/PriceAnalysisSheet.tsx`): thẻ ghim chỉ còn 1 dòng
-   `📈 Lịch sử giá · N mốc · ±x% · khu vực Y tr/m²  ›`; bấm mở sheet 2 tab (Căn này / Khu vực 400 m).
+12. **Biểu đồ giá gom vào một sheet "Phân tích giá"** (`src/components/PriceAnalysisSheet.tsx`): thẻ ghim chỉ còn nút 📊
+   (dòng `📈 Lịch sử giá` đã tạm ẩn trong chi tiết ghim theo yêu cầu 2026-10-24). Mở sheet 2 tab (Căn này / Khu vực 400 m).
    Thêm nút 📊 cạnh hàng lọc để xem giá khu vực quanh tâm bản đồ mà không cần chọn ghim.
 13. Bắt đúng toà khi thả ghim (Photon + Overpass) — xem §8.
 

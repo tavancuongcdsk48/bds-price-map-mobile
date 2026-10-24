@@ -1115,40 +1115,8 @@ export default function App() {
             </View>
           )}
 
-          {/* Xu hướng giá — gói trong 1 dòng, bấm mở sheet "Phân tích giá" (2 tab) */}
-          {(priceHistory.length >= 2 || areaHistory.length >= 2) && (
-            <TouchableOpacity
-              style={styles.trendRow}
-              onPress={() => {
-                setAnalysisTab(priceHistory.length >= 2 ? 'pin' : 'area');
-                setAnalysisVisible(true);
-              }}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.trendTitle}>📈 Lịch sử giá</Text>
-                <Text style={styles.trendSub} numberOfLines={1}>
-                  {(() => {
-                    const parts: string[] = [];
-                    if (priceHistory.length >= 2) {
-                      const first = priceHistory[0].price_vnd;
-                      const last = priceHistory[priceHistory.length - 1].price_vnd;
-                      const pc = first > 0 ? ((last - first) / first) * 100 : null;
-                      parts.push(
-                        `${priceHistory.length} mốc` +
-                          (pc === null ? '' : ` · ${pc >= 0 ? '+' : ''}${pc.toFixed(1).replace('.', ',')}%`)
-                      );
-                    }
-                    const lastArea = areaHistory[areaHistory.length - 1];
-                    if (lastArea && lastArea.median_ppm2 > 0) {
-                      parts.push(`khu vực ${Math.round(lastArea.median_ppm2 / 1000000)} tr/m²`);
-                    }
-                    return parts.join('  ·  ');
-                  })()}
-                </Text>
-              </View>
-              <Text style={styles.trendAction}>Xem ›</Text>
-            </TouchableOpacity>
-          )}
+          {/* Tạm ẩn dòng "Lịch sử giá" trong chi tiết ghim (2026-10-24).
+              Vẫn xem được giá khu vực qua nút 📊 trên bản đồ. */}
 
           {/* Liên hệ chủ nhà — khách chưa đăng nhập chỉ thấy số đã ẩn 4 số cuối */}
           <Text style={styles.contactHint}>
