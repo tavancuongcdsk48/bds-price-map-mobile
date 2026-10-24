@@ -825,11 +825,15 @@ export default function App() {
     return true;
   });
 
+  // Mức zoom hiện tại: dùng để đổi nguồn tile (Esri Dark chỉ có tới z16, ảnh vệ tinh tới z19)
+  const [mapDelta, setMapDelta] = useState(0.02);
+
   const initialRegion: Region = {
-    latitude: location ? location.latitude : 21.0335,
-    longitude: location ? location.longitude : 105.7942,
-    latitudeDelta: 0.02,
-    longitudeDelta: 0.02,
+    // Zoom chính xác vào Đường Ngọc Trai 6 (Ocean Park 1)
+    latitude: 20.99505,
+    longitude: 105.94825,
+    latitudeDelta: 0.0030,
+    longitudeDelta: 0.0030,
   };
 
   return (
@@ -973,6 +977,7 @@ export default function App() {
           initialRegion={initialRegion}
           onRegionChangeComplete={(region) => {
             mapCenterRef.current = { latitude: region.latitude, longitude: region.longitude };
+            setMapDelta(region.latitudeDelta);
             loadPins(region);
             if (pickMode) {
               setPickCenter({ latitude: region.latitude, longitude: region.longitude });
@@ -984,7 +989,13 @@ export default function App() {
         >
           {Platform.OS === 'android' && (
             <UrlTile
-              urlTemplate="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+              key={mapDelta < 0.008 ? 'img' : 'dark'}
+              urlTemplate={
+                mapDelta < 0.008
+                  // zoom sát: nền tối Esri chỉ có tới z16 nên phải dùng ảnh vệ tinh (z19)
+                  ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+                  : 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
+              }
               maximumZ={19}
               flipY={false}
             />

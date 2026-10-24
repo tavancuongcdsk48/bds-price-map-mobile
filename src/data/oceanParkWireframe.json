@@ -1,66 +1,56 @@
 {
   "lines": [
     {
-      "id": "shoreline-island",
-      "name": "Bờ kè Đảo Ngọc Trai",
+      "id": "road-nt6",
+      "name": "Đường Ngọc Trai 6",
       "coordinates": [
         {
-          "latitude": 20.9902,
-          "longitude": 105.946
+          "latitude": 20.9957,
+          "longitude": 105.9473
         },
         {
-          "latitude": 20.9908,
-          "longitude": 105.9485
-        },
-        {
-          "latitude": 20.9915,
-          "longitude": 105.9512
-        },
-        {
-          "latitude": 20.993,
-          "longitude": 105.9522
+          "latitude": 20.9951,
+          "longitude": 105.9482
         },
         {
           "latitude": 20.9945,
-          "longitude": 105.952
-        },
-        {
-          "latitude": 20.9952,
-          "longitude": 105.9505
-        },
-        {
-          "latitude": 20.994,
-          "longitude": 105.9475
-        },
-        {
-          "latitude": 20.9925,
-          "longitude": 105.9458
-        },
-        {
-          "latitude": 20.9902,
-          "longitude": 105.946
+          "longitude": 105.949
         }
       ]
     },
     {
-      "id": "road-nt-main",
-      "name": "Trục đường chính Ngọc Trai",
+      "id": "road-nt3",
+      "name": "Đường Ngọc Trai 3",
       "coordinates": [
         {
-          "latitude": 20.9908,
-          "longitude": 105.9455
+          "latitude": 20.9965,
+          "longitude": 105.948
         },
         {
-          "latitude": 20.992,
-          "longitude": 105.947
+          "latitude": 20.9958,
+          "longitude": 105.9492
         },
         {
-          "latitude": 20.9932,
+          "latitude": 20.9952,
+          "longitude": 105.9502
+        }
+      ]
+    },
+    {
+      "id": "road-nt2",
+      "name": "Đường Ngọc Trai 2",
+      "coordinates": [
+        {
+          "latitude": 20.9972,
           "longitude": 105.9485
         },
         {
-          "latitude": 20.9942,
+          "latitude": 20.9965,
           "longitude": 105.9498
+        },
+        {
+          "latitude": 20.996,
+          "longitude": 105.951
         }
       ]
     }
@@ -785,35 +775,35 @@
     "code": "NT06-10",
     "title": "Biệt thự NT06-10",
     "street": "Đường Ngọc Trai 6",
-    "subdivision": "Đảo Ngọc Trai",
+    "subdivision": "Phân khu Ngọc Trai",
     "project": "Vinhomes Ocean Park 1",
     "type": "biet-thu-song-lap",
     "type_label": "Biệt thự song lập",
     "area_m2": 153.0,
     "center": {
-      "latitude": 20.99292,
-      "longitude": 105.948245
+      "latitude": 20.99507,
+      "longitude": 105.94832
     },
     "coordinates": [
       {
-        "latitude": 20.99285,
-        "longitude": 105.9482
+        "latitude": 20.99505,
+        "longitude": 105.94825
       },
       {
-        "latitude": 20.99299,
-        "longitude": 105.94823
-      },
-      {
-        "latitude": 20.99297,
+        "latitude": 20.99515,
         "longitude": 105.94832
       },
       {
-        "latitude": 20.99283,
-        "longitude": 105.94829
+        "latitude": 20.995089999999998,
+        "longitude": 105.9484
       },
       {
-        "latitude": 20.99285,
-        "longitude": 105.9482
+        "latitude": 20.994989999999998,
+        "longitude": 105.94833
+      },
+      {
+        "latitude": 20.99505,
+        "longitude": 105.94825
       }
     ]
   }
